@@ -1,39 +1,88 @@
 import RegistrationForm from "@/components/registration-form"
+import Image from "next/image"
 
 export default function Page() {
   return (
-    <main className="min-h-screen bg-white text-gray-900">
-      <header className="w-full border-b">
-        <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-4">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-md bg-blue-600" aria-hidden />
-            <span className="font-semibold">SIH Internals (UCEK)</span>
+    <main className="min-h-screen w-full bg-gradient-to-br from-white via-slate-50 to-blue-50 text-gray-900 selection:bg-blue-600/90 selection:text-white">
+      {/* Hero Section */}
+      <section className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-6">
+        {/* subtle animated grid */}
+        <div className="pointer-events-none absolute inset-0 opacity-[0.15] [mask-image:radial-gradient(circle_at_center,black,transparent)]">
+          <div className="animate-[grid-move_12s_linear_infinite] h-full w-full bg-[linear-gradient(to_right,#0a3a9a11_1px,transparent_1px),linear-gradient(to_bottom,#0a3a9a11_1px,transparent_1px)] bg-[size:40px_40px]" />
+        </div>
+        {/* floating orbs */}
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-20 left-1/4 h-60 w-60 animate-pulse rounded-full bg-blue-300/20 blur-3xl" />
+          <div className="absolute bottom-0 right-1/4 h-72 w-72 animate-pulse delay-1000 rounded-full bg-indigo-300/20 blur-3xl" />
+        </div>
+
+        <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center text-center">
+          <div className="group relative mb-10 inline-flex items-center justify-center">
+            <div className="absolute inset-0 animate-spin-slow rounded-full bg-[conic-gradient(var(--tw-gradient-stops))] from-blue-500 via-indigo-500 to-blue-500 opacity-40 blur-md" />
+            <div className="relative flex h-40 w-40 items-center justify-center rounded-2xl border border-blue-500/20 bg-white/70 backdrop-blur-xl shadow-lg shadow-blue-500/10">
+              <Image src="/logo.png" alt="SIH 2025" width={120} height={120} priority className="drop-shadow-sm" />
+            </div>
           </div>
-          <a href="#register" className="rounded-md border px-3 py-1.5 text-sm hover:bg-gray-50">
-            Register
+          <h1 className="text-balance bg-gradient-to-br from-slate-900 via-blue-800 to-indigo-700 bg-clip-text text-4xl font-bold leading-tight tracking-tight text-transparent sm:text-5xl md:text-6xl">
+            Smart India Hackathon 2025
+          </h1>
+          <h2 className="text-xl">UCEK Internal Selection</h2>
+          <p className="mt-6 max-w-2xl text-pretty text-sm leading-relaxed text-slate-600 sm:text-base md:text-lg">
+            UCEK's internal selection for the nationwide innovation marathon. Ideate, build and collaborate to secure
+            your spot. Form diverse teams, showcase creativity and solve real-world challenges.
+          </p>
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-6 sm:gap-8 animate-in fade-in slide-in-from-bottom-4 [animation-delay:200ms]">
+            {PARTNERS.map((p) => (
+              <div key={p.name} className="flex items-center">
+                <Image src={p.logo} alt={p.name} width={44} height={44} className="h-11 w-11 object-contain" />
+              </div>
+            ))}
+          </div>
+          <a
+            href="#register"
+            className="mt-14 inline-flex items-center gap-2 rounded-full border border-blue-600/30 bg-white/80 px-6 py-3 text-sm font-semibold text-blue-700 shadow-sm shadow-blue-500/10 backdrop-blur transition hover:-translate-y-0.5 hover:border-blue-600 hover:bg-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+          >
+            Begin Registration
+            <span aria-hidden className="inline-block animate-bounce">↘</span>
           </a>
         </div>
-      </header>
-
-      <section id="register" className="px-4 py-10">
-        <div className="mx-auto max-w-4xl">
-          <div className="mb-6">
-            <h1 className="text-pretty text-3xl font-semibold leading-9">Smart India Hackathon – Internals (UCEK)</h1>
-            <p className="mt-2 max-w-2xl text-sm text-gray-600">
-              Register your participation, create or join a team with a unique invite code, and receive email
-              confirmation. Teams must have exactly 6 members with at least one female participant.
-            </p>
-          </div>
-
-          <RegistrationForm />
+        <div className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 md:block">
+          <span className="text-xs uppercase tracking-wider text-slate-500">Scroll</span>
         </div>
       </section>
 
-      <footer className="mt-12 border-t">
-        <div className="mx-auto max-w-4xl px-4 py-6 text-sm text-gray-600">
+      {/* Registration Section */}
+      <section id="register" className="relative flex min-h-screen items-start justify-center px-4 py-16 sm:py-20">
+        <div className="relative z-10 mx-auto flex w-full max-w-6xl flex-col-reverse gap-12 md:flex-row md:items-start">
+          <div className="mx-auto w-full max-w-xl pb-12 md:pb-0">
+            <RegistrationForm />
+          </div>
+          <div className="mx-auto max-w-md text-sm text-slate-600 md:sticky md:top-24">
+            <h2 className="mb-4 text-lg font-semibold text-slate-800">How it works</h2>
+            <ol className="space-y-3 [counter-reset:step]">
+              {['Sign in with Google','Fill personal details','Save progress automatically','Form / Join a team of 6 (>=1 female)','Get confirmation email'].map(txt => (
+                <li key={txt} className="relative pl-7 text-slate-600 before:absolute before:left-0 before:top-0 before:flex before:h-5 before:w-5 before:items-center before:justify-center before:rounded-full before:border before:border-blue-500/40 before:bg-white before:text-[10px] before/font-semibold before:text-blue-700 before:content-[counter(step)] counter-increment:step">
+                  {txt}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.08),transparent_60%)]" />
+      </section>
+
+      <footer className="border-t bg-white/70 backdrop-blur">
+        <div className="mx-auto max-w-6xl px-6 py-6 text-xs text-slate-500">
           © {new Date().getFullYear()} UCEK • Smart India Hackathon Internals
         </div>
       </footer>
     </main>
   )
 }
+
+const PARTNERS = [
+  { name: 'Partner A', logo: '/placeholder-logo.png' },
+  { name: 'Partner B', logo: '/placeholder-logo.png' },
+  { name: 'Partner C', logo: '/placeholder-logo.png' },
+  { name: 'Partner D', logo: '/placeholder-logo.png' },
+]

@@ -1,222 +1,620 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import useSWR from "swr"
-import { useEffect, useMemo, useState, useTransition } from "react"
-import { DynamicField } from "./dynamic-field"
-import { GoogleSignInButton, SignOutButton } from "./auth-buttons"
-import confetti from "canvas-confetti"
+import useSWR from "swr";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
+import { DynamicField } from "./dynamic-field";
+import { GoogleSignInButton, SignOutButton } from "./auth-buttons";
+import { signIn } from "next-auth/react";
+import confetti from "canvas-confetti";
+
+type FieldDef = {
+  key: string;
+  label: string;
+  type: "text" | "select";
+  required?: boolean;
+  options?: string[];
+  placeholder?: string;
+};
+
+type SectionDef = {
+  id: string;
+  title: string;
+  description?: string;
+  fields: FieldDef[];
+};
 
 type Schema = {
-  title: string
-  description?: string
-  fields: {
-    key: string
-    label: string
-    type: "text" | "select"
-    required?: boolean
-    options?: string[]
-    placeholder?: string
-  }[]
-}
+  title: string;
+  description?: string;
+  fields?: FieldDef[]; // backward compatibility
+  sections?: SectionDef[];
+};
 
-const fetcher = (url: string) => fetch(url).then((r) => r.json())
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function RegistrationForm() {
-  const [schema, setSchema] = useState<Schema | null>(null)
-  const { data: me, mutate: mutateMe } = useSWR("/api/participant", fetcher)
-  const [form, setForm] = useState<Record<string, string>>({})
-  const [teamMode, setTeamMode] = useState<"none" | "create" | "join">("none")
-  const [teamName, setTeamName] = useState("")
-  const [inviteCode, setInviteCode] = useState("")
-  const [pending, start] = useTransition()
-  const sessionEmail = me?.sessionUser?.email as string | undefined
-  const [showCongrats, setShowCongrats] = useState(false)
+  const [schema, setSchema] = useState<Schema | null>(null);
+  const { data: me, mutate: mutateMe, error: meError, isLoading: loadingMeRaw } = useSWR(() => "/api/participant", fetcher);
+  const [form, setForm] = useState<Record<string, string>>({});
+  const [teamMode, setTeamMode] = useState<"create" | "join">("create");
+  const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const [teamName, setTeamName] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [pending, start] = useTransition();
+  const sessionEmail = me?.sessionUser?.email as string | undefined;
+  const [showCongrats, setShowCongrats] = useState(false);
+  const [currentStep, setCurrentStep] = useState(0);
+  const LOCAL_KEY = "sih-reg-state-v1";
 
   useEffect(() => {
-    import("../app/data/registration-schema.json").then((m) => setSchema(m as any))
-  }, [])
+    import("../app/data/registration-schema.json").then((m) =>
+      setSchema(m as any)
+    );
+  }, []);
 
   useEffect(() => {
     if (me?.participant?.fields) {
-      setForm(me.participant.fields)
+      setForm((prev) => ({ ...prev, ...me.participant.fields }));
     }
-  }, [me?.participant])
+  }, [me?.participant]);
 
-  const fieldsToRender = useMemo(() => {
-    return schema?.fields || []
-  }, [schema])
+  // Restore local state (before sign-in allowed only limited restoration)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(LOCAL_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed.form) setForm(parsed.form);
+        if (typeof parsed.step === "number") setCurrentStep(parsed.step);
+        if (parsed.teamMode)
+          setTeamMode(parsed.teamMode === "none" ? "create" : parsed.teamMode);
+        if (parsed.teamName) setTeamName(parsed.teamName);
+        if (parsed.inviteCode) setInviteCode(parsed.inviteCode);
+      }
+    } catch {}
+  }, []);
+
+  // Persist state
+  useEffect(() => {
+    const data = { form, step: currentStep, teamMode, teamName, inviteCode };
+    try {
+      localStorage.setItem(LOCAL_KEY, JSON.stringify(data));
+    } catch {}
+  }, [form, currentStep, teamMode, teamName, inviteCode]);
+
+  const sections = useMemo<SectionDef[]>(() => {
+    if (!schema) return [];
+    if (schema.sections && schema.sections.length) return schema.sections;
+    if (schema.fields && schema.fields.length) {
+      return [
+        {
+          id: "main",
+          title: "Details",
+          description: "Provide required details",
+          fields: schema.fields,
+        },
+      ];
+    }
+    return [];
+  }, [schema]);
+
+  const totalSteps = 1 /* sign-in */ + sections.length + 1; /* team formation */
 
   function updateField(k: string, v: string) {
-    setForm((f) => ({ ...f, [k]: v }))
+    setForm((f) => ({ ...f, [k]: v }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!sessionEmail) {
-      alert("Please sign in with Google first.")
-      return
+  const goNext = useCallback(() => {
+    setCurrentStep((s) => Math.min(s + 1, totalSteps - 1));
+  }, [totalSteps]);
+  const goBack = useCallback(() => {
+    setCurrentStep((s) => Math.max(s - 1, 0));
+  }, []);
+
+  async function saveParticipant() {
+    if (!sessionEmail) return;
+    const r1 = await fetch("/api/participant", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields: form }),
+    });
+    if (!r1.ok) {
+      const j = await r1.json().catch(() => ({}));
+      setError(j.error || "Failed to save participant");
+      return false;
     }
-    start(async () => {
-      const r1 = await fetch("/api/participant", {
+    setError(null);
+    mutateMe();
+    return true;
+  }
+
+  const { data: teamStatus, mutate: mutateTeam, isLoading: loadingTeamRaw } = useSWR(
+    sessionEmail ? "/api/team/status" : null,
+    fetcher,
+    { refreshInterval: 8000 }
+  );
+  const loadingParticipant = (typeof loadingMeRaw === 'boolean' ? loadingMeRaw : (!me && !meError));
+  const loadingTeam = (typeof loadingTeamRaw === 'boolean' ? loadingTeamRaw : (sessionEmail && !teamStatus));
+  const isLeader = !!teamStatus?.team && teamStatus.team.leaderUserId === sessionEmail;
+
+  async function submitTeamActions() {
+    setError(null);
+    if (teamMode === "create") {
+      if (!teamName.trim()) {
+        setError("Team name is required");
+        return false;
+      }
+      const r2 = await fetch("/api/team/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fields: form }),
-      })
-      const j1 = await r1.json()
-      if (!r1.ok) {
-        alert(j1.error || "Failed to register")
-        return
+        body: JSON.stringify({ name: teamName.trim() }),
+      });
+      const j2 = await r2.json();
+      if (!r2.ok) {
+        setError(j2.error || "Failed to create team");
+        return false;
       }
-
-      if (teamMode === "create" && teamName) {
-        const r2 = await fetch("/api/team/create", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: teamName.trim() }),
-        })
-        const j2 = await r2.json()
-        if (!r2.ok) {
-          alert(j2.error || "Failed to create team")
-          return
-        } else {
-          alert(`Team created! Invite code: ${j2.inviteCode}`)
-        }
-      } else if (teamMode === "join" && inviteCode) {
-        const r3 = await fetch("/api/team/join", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ inviteCode: inviteCode.trim().toUpperCase() }),
-        })
-        const j3 = await r3.json()
-        if (!r3.ok) {
-          alert(j3.error || "Failed to join team")
-          return
-        } else {
-          alert("Joined team successfully!")
-        }
+      setInfo("Team created successfully");
+      await mutateTeam();
+    } else if (teamMode === "join") {
+      if (!inviteCode.trim()) {
+        setError("Invite code required");
+        return false;
       }
-
-      try {
-        confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } })
-        setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 } }), 150)
-        setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 } }), 300)
-      } catch {}
-      setShowCongrats(true)
-
-      mutateMe()
-    })
+      const r3 = await fetch("/api/team/join", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inviteCode: inviteCode.trim().toUpperCase() }),
+      });
+      const j3 = await r3.json();
+      if (!r3.ok) {
+        setError(j3.error || "Failed to join team");
+        return false;
+      }
+      setInfo("Joined team successfully");
+      await mutateTeam();
+    }
+    await mutateTeam();
+    return true;
   }
 
+  async function handlePrimary(e: React.FormEvent) {
+    e.preventDefault();
+    if (currentStep === 0) {
+      if (!sessionEmail) {
+        return;
+      }
+      goNext();
+      return;
+    }
+    // field steps
+    const fieldStepsEndIndex = 1 + sections.length - 1;
+    if (currentStep >= 1 && currentStep <= fieldStepsEndIndex) {
+      if (!sessionEmail) {
+        setError("Sign in required");
+        return;
+      }
+      start(async () => {
+        const ok = await saveParticipant();
+        if (ok) goNext();
+      });
+      return;
+    }
+    // team formation step
+    if (currentStep === totalSteps - 1) {
+      start(async () => {
+        const ok1 = await saveParticipant();
+        if (!ok1) return;
+        const ok2 = await submitTeamActions();
+        if (!ok2) return;
+        setShowCongrats(true);
+        goNext();
+      });
+    }
+  }
+
+  const progressPercent = (currentStep / (totalSteps - 1)) * 100;
+
+  const fieldStepsStart = 1;
+  const fieldStepsEnd = fieldStepsStart + sections.length - 1;
+
+  const isTeamStep = currentStep === totalSteps - 1;
+  const isDone = showCongrats && currentStep === totalSteps;
+  const teamLocked = isTeamStep && !!teamStatus?.team;
+
+  // Fire confetti once when finished
+  useEffect(() => {
+    if (isDone) {
+      try {
+        confetti({ particleCount: 180, spread: 70, origin: { y: 0.6 } });
+        setTimeout(
+          () =>
+            confetti({
+              particleCount: 90,
+              angle: 60,
+              spread: 55,
+              origin: { x: 0 },
+            }),
+          180
+        );
+        setTimeout(
+          () =>
+            confetti({
+              particleCount: 90,
+              angle: 120,
+              spread: 55,
+              origin: { x: 1 },
+            }),
+          360
+        );
+      } catch {}
+    }
+  }, [isDone]);
+
   return (
-    <div className="w-full max-w-xl mx-auto rounded-lg border bg-white p-6 shadow-sm">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold text-balance">{schema?.title || "Registration"}</h2>
-        {schema?.description ? <p className="text-sm text-gray-600 mt-1">{schema.description}</p> : null}
-      </div>
-
-      <div className="mb-4 flex items-center justify-between">
-        <div className="text-sm text-gray-700">
-          {sessionEmail ? (
-            <span>
-              Signed in as <span className="font-medium">{sessionEmail}</span>
-            </span>
-          ) : (
-            <span>Please sign in with Google</span>
-          )}
-        </div>
-        {sessionEmail ? <SignOutButton /> : <GoogleSignInButton />}
-      </div>
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <div className="flex flex-col gap-2">
-          <label className="text-sm font-medium text-gray-700">Email (from Google)</label>
-          <input
-            value={sessionEmail || ""}
-            disabled
-            aria-readonly
-            className="rounded-md border bg-gray-50 px-3 py-2 text-gray-700"
-          />
-        </div>
-
-        {fieldsToRender.map((f) => (
-          <DynamicField key={f.key} field={f} value={form[f.key] || ""} onChange={updateField} />
-        ))}
-
-        <div className="mt-2 rounded-md border p-4">
-          <p className="text-sm font-medium text-gray-800 mb-2">Team Options</p>
-          <div className="flex flex-col gap-2">
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                name="teamMode"
-                value="none"
-                checked={teamMode === "none"}
-                onChange={() => setTeamMode("none")}
-              />
-              <span>No team action</span>
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                name="teamMode"
-                value="create"
-                checked={teamMode === "create"}
-                onChange={() => setTeamMode("create")}
-              />
-              <span>Create new team (leader)</span>
-            </label>
-            {teamMode === "create" && (
-              <input
-                className="rounded-md border px-3 py-2"
-                placeholder="Team Name (unique)"
-                value={teamName}
-                onChange={(e) => setTeamName(e.target.value)}
-              />
-            )}
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                name="teamMode"
-                value="join"
-                checked={teamMode === "join"}
-                onChange={() => setTeamMode("join")}
-              />
-              <span>Join with invite code</span>
-            </label>
-            {teamMode === "join" && (
-              <input
-                className="rounded-md border px-3 py-2 uppercase"
-                placeholder="Invite Code"
-                value={inviteCode}
-                onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-              />
-            )}
-            <p className="text-xs text-gray-600 mt-1">
-              Constraints: Team must have exactly 6 members and include at least 1 female member.
+    <div className="w-full max-w-xl mx-auto rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm backdrop-blur">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight">
+            {schema?.title || "Registration"}
+          </h2>
+          {schema?.description ? (
+            <p className="mt-1 text-xs text-slate-600 max-w-sm">
+              {schema.description}
             </p>
-          </div>
+          ) : null}
         </div>
+        <div className="flex items-center gap-2 text-xs text-slate-600">
+          {currentStep > 0 && sessionEmail && (
+            <>
+              <span className="hidden sm:inline">{sessionEmail}</span>
+              <SignOutButton />
+            </>
+          )}
+          {currentStep > 0 && !sessionEmail && <GoogleSignInButton />}
+        </div>
+      </div>
+      <div className="mb-6 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+        <div
+          className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 transition-all"
+          style={{ width: `${progressPercent}%` }}
+        />
+      </div>
 
-        <button
-          type="submit"
-          disabled={pending || !sessionEmail}
-          className="mt-2 inline-flex items-center justify-center rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-        >
-          {pending ? "Saving..." : "Submit Registration"}
-        </button>
-
-        {showCongrats && (
+      <form onSubmit={handlePrimary} className="flex flex-col gap-5">
+        {/* Inline feedback messages */}
+        {error && (
+          <div className="animate-in fade-in rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700 flex items-start gap-2">
+            <span className="mt-0.5">⚠️</span>
+            <div className="flex-1">{error}</div>
+            <button
+              type="button"
+              onClick={() => setError(null)}
+              className="text-red-600/70 hover:text-red-700 text-[10px] font-medium"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+        {info && !error && (
+          <div className="animate-in fade-in rounded-md border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs text-emerald-700 flex items-start gap-2">
+            <span className="mt-0.5">✅</span>
+            <div className="flex-1">{info}</div>
+            <button
+              type="button"
+              onClick={() => setInfo(null)}
+              className="text-emerald-600/70 hover:text-emerald-700 text-[10px] font-medium"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+  {!error && loadingParticipant && currentStep > 0 && (
           <div
-            className="mt-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 animate-in fade-in-50 slide-in-from-bottom-1"
+            className="animate-in fade-in rounded-md border border-slate-200 bg-white/70 px-3 py-2 text-xs text-slate-600 flex items-center gap-2"
             role="status"
             aria-live="polite"
           >
-            You completed step 1, congrats.
+            <svg
+              className="h-4 w-4 animate-spin text-indigo-600"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+                fill="none"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+              />
+            </svg>
+            Loading your saved data...
+          </div>
+        )}
+        {/* Step content */}
+        {currentStep === 0 && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <p className="text-sm text-slate-600">
+              Sign in with Google to begin your registration.
+            </p>
+            {!sessionEmail && (
+              <div className="flex justify-center">
+                <GoogleSignInButton />
+              </div>
+            )}
+            {sessionEmail && (
+              <div className="rounded-md border border-green-200 bg-green-50 px-4 py-3 text-xs text-green-700">
+                Signed in as <span className="font-medium">{sessionEmail}</span>
+              </div>
+            )}
+            {!sessionEmail && (
+              <p className="text-xs text-amber-600 text-center">
+                You must sign in to continue.
+              </p>
+            )}
+          </div>
+        )}
+
+        {currentStep >= fieldStepsStart && currentStep <= fieldStepsEnd && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            {(() => {
+              const section = sections[currentStep - fieldStepsStart];
+              if (!section) return null;
+              return (
+                <div className="space-y-4">
+                  <div>
+                    <p className="text-sm font-medium text-slate-700 mb-1">
+                      {section.title}
+                    </p>
+                    {section.description && (
+                      <p className="text-xs text-slate-500">
+                        {section.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="grid gap-5">
+                    {section.fields.map((f) => (
+                      <DynamicField
+                        key={f.key}
+                        field={f}
+                        value={form[f.key] || ""}
+                        onChange={updateField}
+                      />
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {isTeamStep && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
+            <div>
+              <p className="text-sm font-medium text-slate-700 mb-1">
+                Team Formation
+              </p>
+              <p className="text-xs text-slate-500">
+                Create a new team or join using an invite code. This step is
+                required.
+              </p>
+            </div>
+            {loadingTeam && (
+              <div className="rounded-lg border border-dashed p-6 flex flex-col items-center justify-center gap-3 bg-white/60">
+                <svg className="h-6 w-6 animate-spin text-indigo-600" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                <p className="text-xs text-slate-600">Loading team status...</p>
+              </div>
+            )}
+            {!loadingTeam && teamStatus?.team ? (
+              <div className="rounded-lg border p-4 bg-gradient-to-br from-indigo-50 to-blue-50">
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-700">Your Team</h3>
+                    {isLeader ? (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm("Delete this team? This cannot be undone.")) {
+                            await fetch("/api/team/status", { method: "DELETE" });
+                            setTeamMode("create");
+                            setTeamName("");
+                            setInviteCode("");
+                            await mutateTeam();
+                          }
+                        }}
+                        className="text-[11px] rounded-md border px-2 py-1 cursor-pointer text-white bg-red-500"
+                      >
+                        Delete Team
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (confirm("Exit this team?")) {
+                            const r = await fetch("/api/team/leave", { method: "POST" });
+                            if (r.ok) {
+                              setInfo("Exited team");
+                              await mutateTeam();
+                            } else {
+                              setError("Failed to exit team");
+                            }
+                          }
+                        }}
+                        className="text-[11px] rounded-md border px-2 py-1 cursor-pointer text-white bg-amber-500"
+                      >
+                        Exit Team
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-600">
+                    <span className="font-medium">Name:</span>{" "}
+                    {teamStatus.team.name}
+                  </p>
+                  <div className="mt-1 rounded-md border bg-white/70 p-3 flex flex-col gap-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium text-slate-700">Invite Code</span>
+                      <button type="button" onClick={async ()=>{ try { await navigator.clipboard.writeText(teamStatus.team.inviteCode); setCopied(true); setInfo('Invite code copied'); setTimeout(()=>setCopied(false),1500);} catch { setError('Failed to copy code')} }} className="text-[10px] rounded border px-2 py-0.5 hover:bg-indigo-50 border-indigo-300 text-indigo-600">{copied ? 'Copied' : 'Copy'}</button>
+                    </div>
+                    <div className="font-mono tracking-wider text-center text-sm text-indigo-700 select-all">{teamStatus.team.inviteCode}</div>
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-[11px] font-medium text-slate-600 mb-1">
+                      Members ({teamStatus.members?.length || 1}/6)
+                    </p>
+                    <ul className="space-y-1">
+                      {(teamStatus.members || []).map((m: any) => {
+                        const leader = teamStatus.team.leaderUserId === m.email;
+                        return (
+                          <li
+                            key={m.email}
+                            className="text-[11px] flex flex-col sm:flex-row sm:items-center sm:justify-between rounded bg-white/70 px-2 py-2 border gap-1 sm:gap-0"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-medium truncate max-w-[10rem] sm:max-w-[14rem]">{m.name}</span>
+                              {leader && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-600 text-white whitespace-nowrap">Team Lead</span>
+                              )}
+                            </div>
+                            <span className="uppercase text-[10px] text-slate-500 tracking-wide">
+                              {m.gender}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            ) : (!loadingTeam && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setTeamMode("create")}
+                  className={`group relative rounded-xl border p-4 text-left transition hover:shadow ${teamMode === "create" ? "border-blue-600 ring-2 ring-blue-600" : "border-slate-200"}`}
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-700">
+                      Create Team
+                    </span>
+                    <span className="text-xs text-blue-600">Leader</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Start a new team as leader & share code.
+                  </p>
+                  {teamMode === "create" && (
+                    <div className="mt-3">
+                      <input
+                        className="w-full rounded-md border px-3 py-2 text-sm"
+                        placeholder="Team Name"
+                        value={teamName}
+                        onChange={(e) => setTeamName(e.target.value)}
+                      />
+                    </div>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTeamMode("join")}
+                  className={`group relative rounded-xl border p-4 text-left transition hover:shadow ${teamMode === "join" ? "border-blue-600 ring-2 ring-blue-600" : "border-slate-200"}`}
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-700">
+                      Join Team
+                    </span>
+                    <span className="text-xs text-indigo-600">Member</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Use an invite code from a leader.
+                  </p>
+                  {teamMode === "join" && (
+                    <div className="mt-3">
+                      <input
+                        className="w-full rounded-md border px-3 py-2 text-sm uppercase tracking-wider"
+                        placeholder="Invite Code"
+                        value={inviteCode}
+                        onChange={(e) =>
+                          setInviteCode(e.target.value.toUpperCase())
+                        }
+                      />
+                    </div>
+                  )}
+                </button>
+              </div>
+            ))}
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              Teams must have exactly 6 members and include at least 1 female
+              participant.
+            </p>
+          </div>
+        )}
+
+        {isDone && (
+          <div
+            className="animate-in fade-in-50 slide-in-from-bottom-1 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800"
+            role="status"
+            aria-live="polite"
+          >
+            Registration complete. You can revisit to modify details before the
+            deadline.
+          </div>
+        )}
+
+        {/* Navigation Buttons (hidden if team already formed) */}
+        {!isDone && !teamLocked && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={goBack}
+              disabled={currentStep === 0 || pending}
+              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-40"
+            >
+              Back
+            </button>
+            <div className="ml-auto flex items-center gap-4 text-[11px] text-slate-500">
+              <span>
+                Step {Math.min(currentStep + 1, totalSteps)} / {totalSteps}
+              </span>
+            </div>
+            <button
+              type="submit"
+              disabled={
+                pending ||
+                (currentStep === 0 && !sessionEmail) ||
+                (isTeamStep && teamMode === "create" && !teamName.trim()) ||
+                (isTeamStep && teamMode === "join" && !inviteCode.trim())
+              }
+              className="inline-flex items-center rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-2 text-sm font-semibold text-white shadow hover:from-blue-500 hover:to-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
+            >
+              {currentStep === 0 && !sessionEmail
+                ? "Awaiting Sign In"
+                : pending
+                  ? "Saving..."
+                  : currentStep === totalSteps - 1
+                    ? "Finish"
+                    : "Continue"}
+            </button>
           </div>
         )}
       </form>
     </div>
-  )
+  );
 }

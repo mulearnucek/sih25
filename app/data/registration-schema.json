@@ -1,40 +1,55 @@
 {
   "title": "Smart India Hackathon - Internals (UCEK) Registration",
-  "description": "Register for SIH Internals (UCEK). Email is taken from your Google account after sign-in.",
-  "fields": [
+  "description": "Register for SIH Internals (UCEK). ",
+  "sections": [
     {
-      "key": "name",
-      "label": "Full Name",
-      "type": "text",
-      "required": true,
-      "placeholder": "Enter your full name"
+      "id": "personal",
+      "title": "Personal Details",
+      "description": "Tell us about yourself.",
+      "fields": [
+        {
+          "key": "name",
+          "label": "Full Name",
+          "type": "text",
+          "required": true,
+          "placeholder": "Enter your full name"
+        },
+        {
+          "key": "gender",
+          "label": "Gender",
+          "type": "select",
+          "required": true,
+          "options": ["male", "female", "non-binary"]
+        },
+        {
+          "key": "phone",
+          "label": "Phone Number",
+          "type": "text",
+          "required": true,
+          "placeholder": "e.g., +91 98765 43210"
+        }
+      ]
     },
     {
-      "key": "gender",
-      "label": "Gender",
-      "type": "select",
-      "required": true,
-      "options": ["male", "female", "non-binary"]
-    },
-    {
-      "key": "phone",
-      "label": "Phone Number",
-      "type": "text",
-      "required": true,
-      "placeholder": "e.g., +91 98765 43210"
-    },
-    {
-      "key": "college",
-      "label": "College/Department",
-      "type": "text",
-      "required": true
-    },
-    {
-      "key": "year",
-      "label": "Year of Study",
-      "type": "select",
-      "required": true,
-      "options": ["1", "2", "3", "4"]
+      "id": "academic",
+      "title": "Academic Details",
+      "description": "Your study information.",
+      "fields": [
+        {
+          "key": "department",
+          "label": "Department/Batch",
+          "type": "select", 
+          "required": true,
+          "options": ["CSE 1", "CSE 2", "IT", "ECE"]
+        },
+        {
+          "key": "year",
+          "label": "Year of Study",
+          "type": "select",
+          "required": true,
+          "options": ["1", "2", "3", "4"]
+        }
+      ]
     }
   ]
 }

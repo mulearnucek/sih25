@@ -1,28 +1,41 @@
-import { auth } from "@/lib/auth"
+"use client";
+import { auth, authOptions } from "@/lib/auth"
 import BroadcastForm from "@/components/broadcast-form"
+import { getServerSession } from "next-auth"
+import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 
 function isAdmin(email?: string | null) {
-  const admins = (process.env.ADMIN_EMAILS || "")
+  const admins = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
   return email && admins.includes(email.toLowerCase())
 }
 
-async function getData() {
-  const [pRes, tRes] = await Promise.all([
-    fetch("/api/dashboard/participants", { cache: "no-store" }),
-    fetch("/api/dashboard/teams", { cache: "no-store" }),
-  ])
-  const participants = pRes.ok ? (await pRes.json()).participants : []
-  const teams = tRes.ok ? (await tRes.json()).teams : []
-  return { participants, teams }
-}
+export default function DashboardPage() {
+  const { data: session } = useSession()
+  const [participants, setParticipants] = useState([])
+  const [teams, setTeams] = useState([])
 
-export default async function DashboardPage() {
-  const session = await auth()
   const email = session?.user?.email
-  if (!isAdmin(email)) {
+
+  useEffect(() => {
+   async function getData() {
+      const [pRes, tRes] = await Promise.all([
+        fetch("/api/dashboard/participants", { cache: "no-store" }),
+        fetch("/api/dashboard/teams", { cache: "no-store" }),
+      ])
+      const participants = pRes.ok ? (await pRes.json()).participants : []
+      const teams = tRes.ok ? (await tRes.json()).teams : []
+      setParticipants(participants)
+      setTeams(teams)
+    }
+    getData()
+  }, [])
+
+
+    if (!isAdmin(email)) {
     return (
       <main className="mx-auto max-w-4xl px-4 py-16">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
@@ -33,9 +46,7 @@ export default async function DashboardPage() {
       </main>
     )
   }
-
-  const { participants, teams } = await getData()
-
+  
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
       <header className="mb-6 flex items-center justify-between">

@@ -13,7 +13,7 @@ const cached = global.__mongooseConn || {
 export async function connectMongoose() {
   if (cached.conn) return cached.conn
   if (!process.env.MONGODB_URI) throw new Error("Missing MONGODB_URI")
-  const dbName = process.env.MONGODB_DB || "sih-internals"
+  const dbName = process.env.MONGODB_DB || "sih"
 
   if (!cached.promise) {
     mongoose.set("strictQuery", true)

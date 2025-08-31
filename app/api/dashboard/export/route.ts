@@ -4,9 +4,11 @@ import * as XLSX from "xlsx"
 import { connectMongoose } from "@/lib/mongoose"
 import Participant from "@/models/participant"
 import Team from "@/models/team"
+import { authOptions } from "@/lib/auth"
+import { getServerSession } from "next-auth"
 
 function isAdmin(email?: string | null) {
-  const admins = (process.env.ADMIN_EMAILS || "")
+  const admins = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
@@ -14,7 +16,7 @@ function isAdmin(email?: string | null) {
 }
 
 export async function GET() {
-  const session = await auth()
+  const session = await getServerSession(authOptions)
   if (!isAdmin(session?.user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
 
   await connectMongoose()

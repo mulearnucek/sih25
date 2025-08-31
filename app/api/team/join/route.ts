@@ -1,12 +1,13 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
+import { auth, authOptions } from "@/lib/auth"
 import { connectMongoose } from "@/lib/mongoose"
 import Team from "@/models/team"
 import Participant from "@/models/participant"
 import { canJoinPreservingFemaleRequirement } from "@/lib/team"
+import { getServerSession } from "next-auth"
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
+  const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   const body = await req.json().catch(() => ({}))
   const { inviteCode } = body as { inviteCode: string }

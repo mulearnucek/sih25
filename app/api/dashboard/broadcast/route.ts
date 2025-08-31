@@ -1,11 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import { sendBroadcastEmail } from "@/lib/email"
 import { connectMongoose } from "@/lib/mongoose"
 import Participant from "@/models/participant"
+import { authOptions } from "@/lib/auth"
+import { getServerSession } from "next-auth"
 
 function isAdmin(email?: string | null) {
-  const admins = (process.env.ADMIN_EMAILS || "")
+  const admins = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
     .split(",")
     .map((s) => s.trim().toLowerCase())
     .filter(Boolean)
@@ -13,7 +14,7 @@ function isAdmin(email?: string | null) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
+  const session = await getServerSession(authOptions)
   if (!isAdmin(session?.user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
   const { subject, message } = await req.json().catch(() => ({}))
   if (!subject || !message) {
