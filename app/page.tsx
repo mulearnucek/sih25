@@ -71,9 +71,13 @@ export default function Page() {
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.08),transparent_60%)]" />
       </section>
 
-      <footer className="border-t bg-white/70 backdrop-blur">
-        <div className="mx-auto max-w-6xl px-6 py-6 text-xs text-slate-500">
-          © {new Date().getFullYear()} UCEK • Smart India Hackathon Internals
+      <footer className="border-t mx-auto flex-col text-xs text-slate-500 sm:flex-row px-6 py-6 bg-white/70 backdrop-blur flex items-center justify-between gap-3">
+        <div>
+          Smart India Hackathon '25 Internals
+        </div>
+          University College of Engineering, Kariavattom
+        <div>
+          Made with 💖 by <a href="https://mulearn.uck.ac.in">μlearn UCEK</a>
         </div>
       </footer>
     </main>
