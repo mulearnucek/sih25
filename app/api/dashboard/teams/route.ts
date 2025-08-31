@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { getDb } from "@/lib/mongodb"
+import { connectMongoose } from "@/lib/mongoose"
+import Team from "@/models/team"
 
 function isAdmin(email?: string | null) {
   const admins = (process.env.ADMIN_EMAILS || "")
@@ -13,10 +14,7 @@ function isAdmin(email?: string | null) {
 export async function GET() {
   const session = await auth()
   if (!isAdmin(session?.user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
-  const db = await getDb()
-  const teams = await db
-    .collection("teams")
-    .find({}, { projection: { _id: 0 } })
-    .toArray()
+  await connectMongoose()
+  const teams = await Team.find({}, { _id: 0, __v: 0 }).lean()
   return NextResponse.json({ teams })
 }

@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { getDb } from "@/lib/mongodb"
+import { connectMongoose } from "@/lib/mongoose"
+import Team from "@/models/team"
+import Participant from "@/models/participant"
 import { canJoinPreservingFemaleRequirement } from "@/lib/team"
 
 export async function POST(req: NextRequest) {
@@ -10,27 +12,24 @@ export async function POST(req: NextRequest) {
   const { inviteCode } = body as { inviteCode: string }
   if (!inviteCode) return NextResponse.json({ error: "Invite code required" }, { status: 400 })
 
-  const db = await getDb()
+  await connectMongoose()
   const userId = session.user.email
 
-  const participant = await db.collection("participants").findOne({ email: userId })
+  const participant = await Participant.findOne({ email: userId }).lean()
   if (!participant) {
     return NextResponse.json({ error: "Complete registration first" }, { status: 400 })
   }
   const gender = (participant.gender || "").toLowerCase()
 
-  const existingTeam = await db.collection("teams").findOne({ memberUserIds: userId })
+  const existingTeam = await Team.findOne({ memberUserIds: userId })
   if (existingTeam) {
     return NextResponse.json({ error: "You are already in a team" }, { status: 400 })
   }
 
-  const team = await db.collection("teams").findOne({ inviteCode })
+  const team = await Team.findOne({ inviteCode }).lean()
   if (!team) return NextResponse.json({ error: "Invalid invite code" }, { status: 404 })
 
-  const members = await db
-    .collection("participants")
-    .find({ email: { $in: team.memberUserIds || [] } }, { projection: { gender: 1 } })
-    .toArray()
+  const members = await Participant.find({ email: { $in: team.memberUserIds || [] } }, { gender: 1, _id: 0 }).lean()
   const memberGenders = members.map((m: any) => (m.gender as string).toLowerCase())
 
   const canJoin = canJoinPreservingFemaleRequirement(memberGenders as any, gender as any, 6)
@@ -48,9 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Team is full (6 members)" }, { status: 400 })
   }
 
-  await db
-    .collection("teams")
-    .updateOne({ _id: team._id }, { $addToSet: { memberUserIds: userId }, $set: { updatedAt: new Date() } })
+  await Team.updateOne({ _id: team._id }, { $addToSet: { memberUserIds: userId }, $set: { updatedAt: new Date() } })
 
   return NextResponse.json({ ok: true })
 }

@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { getDb } from "@/lib/mongodb"
+import { connectMongoose } from "@/lib/mongoose"
+import Participant from "@/models/participant"
 import { sendRegistrationEmail } from "@/lib/email"
 
 export async function GET() {
@@ -8,8 +9,8 @@ export async function GET() {
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
   }
-  const db = await getDb()
-  const participant = await db.collection("participants").findOne({ email: session.user.email })
+  await connectMongoose()
+  const participant = await Participant.findOne({ email: session.user.email }).lean()
   return NextResponse.json({ participant, sessionUser: session.user })
 }
 
@@ -33,11 +34,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing required fields: name, gender" }, { status: 400 })
   }
 
-  const db = await getDb()
-  const existing = await db.collection("participants").findOne({ email })
+  await connectMongoose()
+  const existing = await Participant.findOne({ email })
 
   if (existing) {
-    await db.collection("participants").updateOne(
+    await Participant.updateOne(
       { email },
       {
         $set: {
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest) {
     )
     return NextResponse.json({ ok: true, updated: true })
   } else {
-    await db.collection("participants").insertOne({
+    await Participant.create({
       name,
       gender,
       email,

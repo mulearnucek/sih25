@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { getDb } from "@/lib/mongodb"
+import { connectMongoose } from "@/lib/mongoose"
+import Team from "@/models/team"
+import Participant from "@/models/participant"
 import { generateInviteCode } from "@/lib/team"
 
 export async function POST(req: NextRequest) {
@@ -12,22 +14,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Team name required" }, { status: 400 })
   }
 
-  const db = await getDb()
+  await connectMongoose()
   const userId = session.user.email
 
-  const existingTeam = await db.collection("teams").findOne({ memberUserIds: userId })
+  const existingTeam = await Team.findOne({ memberUserIds: userId })
   if (existingTeam) {
     return NextResponse.json({ error: "You are already in a team" }, { status: 400 })
   }
 
-  const participant = await db.collection("participants").findOne({ email: userId })
+  const participant = await Participant.findOne({ email: userId })
   if (!participant) {
     return NextResponse.json({ error: "Complete registration first" }, { status: 400 })
   }
 
   const inviteCode = generateInviteCode()
   try {
-    await db.collection("teams").insertOne({
+    await Team.create({
       name,
       inviteCode,
       leaderUserId: userId,

@@ -1,7 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
-import { getDb } from "@/lib/mongodb"
 import { sendBroadcastEmail } from "@/lib/email"
+import { connectMongoose } from "@/lib/mongoose"
+import Participant from "@/models/participant"
 
 function isAdmin(email?: string | null) {
   const admins = (process.env.ADMIN_EMAILS || "")
@@ -19,12 +20,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Subject and message required" }, { status: 400 })
   }
 
-  const db = await getDb()
-  const emails = await db
-    .collection("participants")
-    .find({}, { projection: { email: 1, _id: 0 } })
-    .toArray()
+  await connectMongoose()
+  const emails = await Participant.find({}, { email: 1, _id: 0 }).lean()
   const to = emails.map((e: any) => e.email).filter(Boolean)
+
   if (to.length === 0) return NextResponse.json({ ok: true, info: "No recipients" })
   try {
     await sendBroadcastEmail(to, subject, message)

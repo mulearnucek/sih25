@@ -6,6 +6,7 @@ import useSWR from "swr"
 import { useEffect, useMemo, useState, useTransition } from "react"
 import { DynamicField } from "./dynamic-field"
 import { GoogleSignInButton, SignOutButton } from "./auth-buttons"
+import confetti from "canvas-confetti"
 
 type Schema = {
   title: string
@@ -31,6 +32,7 @@ export default function RegistrationForm() {
   const [inviteCode, setInviteCode] = useState("")
   const [pending, start] = useTransition()
   const sessionEmail = me?.sessionUser?.email as string | undefined
+  const [showCongrats, setShowCongrats] = useState(false)
 
   useEffect(() => {
     import("../app/data/registration-schema.json").then((m) => setSchema(m as any))
@@ -96,8 +98,14 @@ export default function RegistrationForm() {
         }
       }
 
+      try {
+        confetti({ particleCount: 120, spread: 70, origin: { y: 0.6 } })
+        setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 } }), 150)
+        setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 } }), 300)
+      } catch {}
+      setShowCongrats(true)
+
       mutateMe()
-      alert("Registration saved. A confirmation email has been sent if this is your first time.")
     })
   }
 
@@ -198,6 +206,16 @@ export default function RegistrationForm() {
         >
           {pending ? "Saving..." : "Submit Registration"}
         </button>
+
+        {showCongrats && (
+          <div
+            className="mt-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800 animate-in fade-in-50 slide-in-from-bottom-1"
+            role="status"
+            aria-live="polite"
+          >
+            You completed step 1, congrats.
+          </div>
+        )}
       </form>
     </div>
   )
