@@ -1,0 +1,56 @@
+import { type NextRequest, NextResponse } from "next/server"
+import { auth } from "@/lib/auth"
+import { getDb } from "@/lib/mongodb"
+import { canJoinPreservingFemaleRequirement } from "@/lib/team"
+
+export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+  const body = await req.json().catch(() => ({}))
+  const { inviteCode } = body as { inviteCode: string }
+  if (!inviteCode) return NextResponse.json({ error: "Invite code required" }, { status: 400 })
+
+  const db = await getDb()
+  const userId = session.user.email
+
+  const participant = await db.collection("participants").findOne({ email: userId })
+  if (!participant) {
+    return NextResponse.json({ error: "Complete registration first" }, { status: 400 })
+  }
+  const gender = (participant.gender || "").toLowerCase()
+
+  const existingTeam = await db.collection("teams").findOne({ memberUserIds: userId })
+  if (existingTeam) {
+    return NextResponse.json({ error: "You are already in a team" }, { status: 400 })
+  }
+
+  const team = await db.collection("teams").findOne({ inviteCode })
+  if (!team) return NextResponse.json({ error: "Invalid invite code" }, { status: 404 })
+
+  const members = await db
+    .collection("participants")
+    .find({ email: { $in: team.memberUserIds || [] } }, { projection: { gender: 1 } })
+    .toArray()
+  const memberGenders = members.map((m: any) => (m.gender as string).toLowerCase())
+
+  const canJoin = canJoinPreservingFemaleRequirement(memberGenders as any, gender as any, 6)
+  if (!canJoin) {
+    return NextResponse.json(
+      {
+        error:
+          "Team joining would violate constraints. Teams must have 6 members and at least 1 female member. The last slot must be taken by a female if none in team yet.",
+      },
+      { status: 400 },
+    )
+  }
+
+  if ((team.memberUserIds?.length || 0) >= 6) {
+    return NextResponse.json({ error: "Team is full (6 members)" }, { status: 400 })
+  }
+
+  await db
+    .collection("teams")
+    .updateOne({ _id: team._id }, { $addToSet: { memberUserIds: userId }, $set: { updatedAt: new Date() } })
+
+  return NextResponse.json({ ok: true })
+}
