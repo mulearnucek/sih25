@@ -24,7 +24,7 @@ export function SignOutButton() {
   return (
     <button
       onClick={() => start(async () => { try { localStorage.removeItem('sih-reg-state-v1') } catch {}; await signOut(); })}
-      className="inline-flex items-center justify-center rounded-md border px-4 py-2 hover:bg-gray-50 disabled:opacity-50"
+      className="inline-flex items-center justify-center rounded-md border px-4 py-2 whitespace-nowrap hover:bg-gray-50 disabled:opacity-50"
       disabled={pending}
       aria-label="Sign out"
     >
