@@ -654,7 +654,7 @@ export default function RegistrationForm() {
                 Step {Math.min(currentStep + 1, totalSteps)} / {totalSteps}
               </span>
             </div>
-            <button
+            {sessionEmail != null && <button
               type="submit"
               disabled={
                 pending ||
@@ -665,13 +665,13 @@ export default function RegistrationForm() {
               className="inline-flex items-center rounded-md bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-2 text-sm font-semibold text-white shadow hover:from-blue-500 hover:to-indigo-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50"
             >
               {currentStep === 0 && !sessionEmail
-                ? "Awaiting Sign In"
+                ? null
                 : pending
                   ? "Saving..."
                   : currentStep === totalSteps - 1
                     ? "Finish"
                     : "Continue"}
-            </button>
+            </button>}
           </div>
         )}
       </form>

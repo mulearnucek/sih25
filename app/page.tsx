@@ -17,24 +17,27 @@ export default function Page() {
         </div>
 
         <div className="relative z-10 mx-auto flex max-w-5xl flex-col items-center text-center">
-          <div className="group relative mb-10 inline-flex items-center justify-center">
+          <div>
+            <Image src="/banner2.png" alt="SIH 2025" width={500} height={120} priority className="drop-shadow-sm mb-5 mt-5 sm:mt-0" />
+          </div>
+          {/* <div className="group relative mb-10 inline-flex items-center justify-center">
             <div className="absolute inset-0 animate-spin-slow rounded-full bg-[conic-gradient(var(--tw-gradient-stops))] from-blue-500 via-indigo-500 to-blue-500 opacity-40 blur-md" />
             <div className="relative flex h-40 w-40 items-center justify-center rounded-2xl border border-blue-500/20 bg-white/70 backdrop-blur-xl shadow-lg shadow-blue-500/10">
               <Image src="/logo.png" alt="SIH 2025" width={120} height={120} priority className="drop-shadow-sm" />
             </div>
-          </div>
+          </div> */}
           <h1 className="text-balance bg-gradient-to-br from-slate-900 via-blue-800 to-indigo-700 bg-clip-text text-4xl font-bold leading-tight tracking-tight text-transparent sm:text-5xl md:text-6xl">
             Smart India Hackathon 2025
           </h1>
-          <h2 className="text-xl">UCEK Internal Selection</h2>
+          <h2 className="text-xl">University College of Engineering, Kariavattom - Internal Selection</h2>
           <p className="mt-6 max-w-2xl text-pretty text-sm leading-relaxed text-slate-600 sm:text-base md:text-lg">
             UCEK's internal selection for the nationwide innovation marathon. Ideate, build and collaborate to secure
             your spot. Form diverse teams, showcase creativity and solve real-world challenges.
           </p>
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-6 sm:gap-8 animate-in fade-in slide-in-from-bottom-4 [animation-delay:200ms]">
+          <div className="mt-3 sm:mt-10 flex flex-wrap items-center justify-center gap-3 sm:gap-8 animate-in fade-in slide-in-from-bottom-4 [animation-delay:200ms]">
             {PARTNERS.map((p) => (
               <div key={p.name} className="flex items-center">
-                <Image src={p.logo} alt={p.name} width={44} height={44} className="h-24 w-24 object-contain" />
+                <Image src={p.logo} alt={p.name} width={44} height={44} className="h-20 w-20 sm:h-24 sm:w-24 object-contain" />
               </div>
             ))}
           </div>
@@ -58,7 +61,7 @@ export default function Page() {
             <RegistrationForm />
           </div>
           <div className="mx-auto max-w-md text-sm text-slate-600 md:sticky md:top-24">
-            <h2 className="mb-4 text-lg font-semibold text-slate-800">SIH 2025 Process</h2>
+            <h2 className="mb-4 text-lg font-semibold text-slate-800">SIH 2025 Internals Process</h2>
             <ol className="space-y-3 [counter-reset:step]">
               {[
                 'Individual Registration (closes on 15 Sept)',
@@ -92,8 +95,7 @@ export default function Page() {
 }
 
 const PARTNERS = [
-  { name: 'Partner A', logo: '/MulearnUCEK.png' },
   { name: 'Partner B', logo: '/IEDC.png' },
-  { name: 'Partner C', logo: '/Foss.png' },
-  { name: 'Partner D', logo: '/logo.png' },
+  { name: 'Partner A', logo: '/MulearnUCEK.png' },
+  { name: 'Partner C', logo: '/Foss.png' }
 ]
