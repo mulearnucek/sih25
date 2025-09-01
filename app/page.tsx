@@ -34,13 +34,13 @@ export default function Page() {
           <div className="mt-10 flex flex-wrap items-center justify-center gap-6 sm:gap-8 animate-in fade-in slide-in-from-bottom-4 [animation-delay:200ms]">
             {PARTNERS.map((p) => (
               <div key={p.name} className="flex items-center">
-                <Image src={p.logo} alt={p.name} width={44} height={44} className="h-18 w-18 object-contain" />
+                <Image src={p.logo} alt={p.name} width={44} height={44} className="h-24 w-24 object-contain" />
               </div>
             ))}
           </div>
           <a
             href="#register"
-            className="mt-8 inline-flex items-center gap-2 rounded-full border border-blue-600/30 bg-white/80 px-6 py-3 text-sm font-semibold text-blue-700 shadow-sm shadow-blue-500/10 backdrop-blur transition hover:-translate-y-0.5 hover:border-blue-600 hover:bg-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+            className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-600/30 bg-white/80 px-6 py-3 text-sm font-semibold text-blue-700 shadow-sm shadow-blue-500/10 backdrop-blur transition hover:-translate-y-0.5 hover:border-blue-600 hover:bg-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
           >
             Begin Registration
             <span aria-hidden className="inline-block animate-bounce">↘</span>
@@ -58,10 +58,17 @@ export default function Page() {
             <RegistrationForm />
           </div>
           <div className="mx-auto max-w-md text-sm text-slate-600 md:sticky md:top-24">
-            <h2 className="mb-4 text-lg font-semibold text-slate-800">How it works</h2>
+            <h2 className="mb-4 text-lg font-semibold text-slate-800">SIH 2025 Process</h2>
             <ol className="space-y-3 [counter-reset:step]">
-              {['Sign in with Google','Fill personal details','Save progress automatically','Form / Join a team of 6 (>=1 female)','Get confirmation email'].map(txt => (
-                <li key={txt} className="relative pl-7 text-slate-600 before:absolute before:left-0 before:top-0 before:flex before:h-5 before:w-5 before:items-center before:justify-center before:rounded-full before:border before:border-blue-500/40 before:bg-white before:text-[10px] before/font-semibold before:text-blue-700 before:content-[counter(step)] counter-increment:step">
+              {[
+                'Individual Registration (closes on 15 Sept)',
+                'Form a Team of 6 members (atleast 1 female team member)',
+                'Select Problem Statement - Choose a problem statement from SIH',
+                'Kickoff & Mentorship - Meet your team & assigned mentor',
+                'Idea Development - Guided sessions + mentor support',
+                'Final Pitching (Ideathon) - Pitch your solution & get shortlisted for next level of SIH'
+              ].map(txt => (
+                <li key={txt} className="relative pl-7 text-slate-600 before:absolute before:left-0 before:top-0 before:flex before:h-5 before:w-5 before:items-center before:justify-center before:rounded-full before:border before:border-blue-500/40 before:bg-white before:text-[10px] before:font-semibold before:text-blue-700 before:content-[counter(step)] [counter-increment:step]">
                   {txt}
                 </li>
               ))}

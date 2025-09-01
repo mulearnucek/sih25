@@ -508,6 +508,23 @@ export default function RegistrationForm() {
                         <span className="text-[11px] font-medium text-green-700">Team Complete</span>
                       </div>
                       <p className="text-[10px] text-green-600 mt-1">Your team has reached the maximum capacity of 6 members.</p>
+                      
+                      {/* Problem Statement Link */}
+                      <div className="mt-3 pt-2 border-t border-green-200">
+                        <p className="text-[10px] text-green-700 font-medium mb-2">🚀 Next Step: Choose Your Problem Statement</p>
+                        <a 
+                          href="https://sih.gov.in/sih2025PS" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[10px] bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md transition-colors"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          View SIH 2025 Problem Statements
+                        </a>
+                        <p className="text-[9px] text-green-600 mt-1">Browse official problem statements for Smart India Hackathon 2025</p>
+                      </div>
                     </div>
                   )}
                   <div className="mt-2">
