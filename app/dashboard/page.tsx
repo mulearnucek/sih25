@@ -17,105 +17,473 @@ export default function DashboardPage() {
   const { data: session } = useSession()
   const [participants, setParticipants] = useState([])
   const [teams, setTeams] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [error, setError] = useState<string | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
   const email = session?.user?.email
 
-  useEffect(() => {
-   async function getData() {
+  const fetchData = async () => {
+    if (!session) return
+    
+    try {
+      setError(null)
+      setLoading(true)
       const [pRes, tRes] = await Promise.all([
-        fetch("/api/dashboard/participants", { cache: "no-store" }),
-        fetch("/api/dashboard/teams", { cache: "no-store" }),
+        fetch("/api/dashboard/participants", { 
+          cache: "no-store",
+          credentials: 'include'
+        }),
+        fetch("/api/dashboard/teams", { 
+          cache: "no-store",
+          credentials: 'include'
+        }),
       ])
-      const participants = pRes.ok ? (await pRes.json()).participants : []
-      const teams = tRes.ok ? (await tRes.json()).teams : []
-      setParticipants(participants)
-      setTeams(teams)
+      
+      if (!pRes.ok) {
+        const errorData = await pRes.json()
+        console.error('Participants API error:', errorData)
+        throw new Error(`Failed to fetch participants: ${errorData.error || pRes.statusText}`)
+      }
+      
+      if (!tRes.ok) {
+        const errorData = await tRes.json()
+        console.error('Teams API error:', errorData)
+        throw new Error(`Failed to fetch teams: ${errorData.error || tRes.statusText}`)
+      }
+      
+      const participantsData = await pRes.json()
+      const teamsData = await tRes.json()
+      
+      console.log('Participants data:', participantsData)
+      console.log('Teams data:', teamsData)
+      
+      setParticipants(participantsData.participants || [])
+      setTeams(teamsData.teams || [])
+      setLastUpdated(new Date())
+    } catch (error) {
+      console.error('Failed to fetch data:', error)
+      setError(error instanceof Error ? error.message : 'Failed to fetch data')
+    } finally {
+      setLoading(false)
     }
-    getData()
-  }, [])
+  }
 
+  useEffect(() => {
+    fetchData()
+  }, [session])
 
-    if (!isAdmin(email)) {
+  // Calculate statistics
+  const stats = {
+    totalParticipants: participants.length,
+    totalTeams: teams.length,
+    completeTeams: teams.filter((t: any) => {
+      const memberCount = (t.memberUserIds?.length || 0) + (t.leaderUserId ? 1 : 0)
+      return memberCount === 6
+    }).length,
+    averageTeamSize: teams.length > 0 ? 
+      Math.round(
+        teams.reduce((acc: number, t: any) => {
+          const memberCount = (t.memberUserIds?.length || 0) + (t.leaderUserId ? 1 : 0)
+          return acc + memberCount
+        }, 0) / teams.length * 10
+      ) / 10 : 0
+  }
+
+  console.log('Current stats:', stats)
+  console.log('Participants:', participants)
+  console.log('Teams:', teams)
+
+  if (!isAdmin(email)) {
     return (
-      <main className="mx-auto max-w-4xl px-4 py-16">
-        <h1 className="text-2xl font-semibold">Dashboard</h1>
-        <p className="mt-2 text-gray-600">You do not have access to this page.</p>
-        <a className="mt-4 inline-block rounded-md border px-3 py-2 text-sm hover:bg-gray-50" href="/">
-          Go back
-        </a>
-      </main>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg border p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H9m3-2V9m0 0V7m0 2H9m3 0h3m-6 4l6-6" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h1>
+          <p className="text-gray-600 mb-6">You do not have permission to access this dashboard.</p>
+          <a 
+            href="/" 
+            className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors duration-200"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Go back
+          </a>
+        </div>
+      </div>
     )
   }
   
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg border p-8">
+          <div className="flex items-center space-x-4">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+            <span className="text-gray-700 font-medium">Loading dashboard...</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="bg-white rounded-xl shadow-lg border p-8 max-w-md text-center">
+          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Dashboard</h1>
+          <p className="text-gray-600 mb-6">{error}</p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors duration-200"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <main className="mx-auto max-w-6xl px-4 py-8">
-      <header className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Admin Dashboard</h1>
-        <a href="/api/dashboard/export" className="rounded-md bg-amber-500 px-4 py-2 text-white hover:bg-amber-600">
-          Export XLSX
-        </a>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            <div className="flex items-center space-x-4">
+              <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">
+                  Admin Dashboard
+                </h1>
+                <p className="text-sm text-gray-500">SIH 2025 Registration Management</p>
+              </div>
+            </div>
+            
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">{session?.user?.name}</p>
+                <p className="text-xs text-gray-500">{email}</p>
+              </div>
+              <button 
+                onClick={fetchData}
+                disabled={loading}
+                className="inline-flex items-center px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors duration-200 disabled:opacity-50"
+                title="Refresh Data"
+              >
+                <svg className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+              <a 
+                href="/api/dashboard/export" 
+                className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors duration-200"
+              >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                Export Data
+              </a>
+            </div>
+          </div>
+        </div>
       </header>
 
-      <section className="mb-8 rounded-md border p-4">
-        <h2 className="mb-3 text-lg font-semibold">Broadcast Email</h2>
-        <BroadcastForm />
-      </section>
-
-      <section className="mb-8 rounded-md border p-4">
-        <h2 className="mb-3 text-lg font-semibold">Participants ({participants.length})</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="text-left">
-                <th className="border-b px-3 py-2">Name</th>
-                <th className="border-b px-3 py-2">Email</th>
-                <th className="border-b px-3 py-2">Gender</th>
-                <th className="border-b px-3 py-2">Phone</th>
-                <th className="border-b px-3 py-2">College</th>
-                <th className="border-b px-3 py-2">Year</th>
-              </tr>
-            </thead>
-            <tbody>
-              {participants.map((p: any) => (
-                <tr key={p.email}>
-                  <td className="border-b px-3 py-2">{p.name}</td>
-                  <td className="border-b px-3 py-2">{p.email}</td>
-                  <td className="border-b px-3 py-2 capitalize">{p.gender}</td>
-                  <td className="border-b px-3 py-2">{p.fields?.phone || ""}</td>
-                  <td className="border-b px-3 py-2">{p.fields?.college || ""}</td>
-                  <td className="border-b px-3 py-2">{p.fields?.year || ""}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Registration Statistics</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {lastUpdated ? (
+                <>Last updated: {lastUpdated.toLocaleString()}</>
+              ) : (
+                <>Real-time registration data</>
+              )}
+            </p>
+          </div>
+          {participants.length === 0 && teams.length === 0 && !loading && (
+            <div className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              No registration data found
+            </div>
+          )}
         </div>
-      </section>
 
-      <section className="mb-8 rounded-md border p-4">
-        <h2 className="mb-3 text-lg font-semibold">Teams ({teams.length})</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm">
-            <thead>
-              <tr className="text-left">
-                <th className="border-b px-3 py-2">Team Name</th>
-                <th className="border-b px-3 py-2">Invite Code</th>
-                <th className="border-b px-3 py-2">Leader</th>
-                <th className="border-b px-3 py-2">Members Count</th>
-              </tr>
-            </thead>
-            <tbody>
-              {teams.map((t: any) => (
-                <tr key={t.name}>
-                  <td className="border-b px-3 py-2">{t.name}</td>
-                  <td className="border-b px-3 py-2 font-mono">{t.inviteCode}</td>
-                  <td className="border-b px-3 py-2">{t.leaderUserId}</td>
-                  <td className="border-b px-3 py-2">{t.memberUserIds?.length || 0}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Participants</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalParticipants}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Teams</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.totalTeams}</p>
+              </div>
+              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Complete Teams</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.completeTeams}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {stats.totalTeams > 0 ? Math.round((stats.completeTeams / stats.totalTeams) * 100) : 0}% completion
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Avg Team Size</p>
+                <p className="text-3xl font-bold text-gray-900">{stats.averageTeamSize}</p>
+                <p className="text-xs text-gray-500 mt-1">Target: 6 members</p>
+              </div>
+              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+            </div>
+          </div>
         </div>
-      </section>
-    </main>
+
+        {/* Navigation Tabs */}
+        <div className="mb-8">
+          <nav className="flex space-x-1 bg-white rounded-lg p-1 border border-gray-200">
+            {[
+              { id: 'overview', name: 'Overview', icon: '📊' },
+              { id: 'participants', name: 'Participants', icon: '👥' },
+              { id: 'teams', name: 'Teams', icon: '🏆' },
+              { id: 'broadcast', name: 'Broadcast', icon: '📢' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors duration-200 ${
+                  activeTab === tab.id
+                    ? 'bg-gray-900 text-white'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                <span>{tab.icon}</span>
+                <span>{tab.name}</span>
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        {/* Content based on active tab */}
+        {activeTab === 'overview' && (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Registration Status */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <span className="w-6 h-6 bg-gray-900 rounded-md flex items-center justify-center text-white text-sm mr-2">📈</span>
+                Registration Status
+              </h3>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-600">Complete Teams</span>
+                  <span className="font-semibold">{stats.completeTeams} / {stats.totalTeams}</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className="bg-green-600 h-2 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.round((stats.completeTeams / Math.max(stats.totalTeams, 1)) * 100)}%` }}
+                  ></div>
+                </div>
+                <div className="text-xs text-gray-500 text-center">
+                  {Math.round((stats.completeTeams / Math.max(stats.totalTeams, 1)) * 100)}% teams completed
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                <span className="w-6 h-6 bg-gray-900 rounded-md flex items-center justify-center text-white text-sm mr-2">⚡</span>
+                Quick Actions
+              </h3>
+              <div className="space-y-3">
+                <button 
+                  onClick={() => setActiveTab('broadcast')}
+                  className="w-full text-left p-3 rounded border hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-lg">📢</span>
+                    <span className="text-sm font-medium">Send Broadcast Email</span>
+                  </div>
+                </button>
+                <a 
+                  href="/api/dashboard/export"
+                  className="block w-full text-left p-3 rounded border hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex items-center space-x-3">
+                    <span className="text-lg">📊</span>
+                    <span className="text-sm font-medium">Export Data</span>
+                  </div>
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'broadcast' && (
+          <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
+            <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center">
+              <span className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-white text-sm mr-3">📢</span>
+              Broadcast Email
+            </h2>
+            <BroadcastForm />
+          </div>
+        )}
+
+        {activeTab === 'participants' && (
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <span className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-white text-sm mr-3">👥</span>
+                Participants ({participants.length})
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">College</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Year</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {participants.map((p: any, index: number) => (
+                    <tr key={p.email} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{p.name}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{p.email}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{p.gender || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{p.fields?.phone || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{p.fields?.college || 'N/A'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{p.fields?.year || 'N/A'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'teams' && (
+          <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-200">
+              <h2 className="text-xl font-semibold text-gray-900 flex items-center">
+                <span className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-white text-sm mr-3">🏆</span>
+                Teams ({teams.length})
+              </h2>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Team Name</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Invite Code</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leader</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Members</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {teams.map((t: any, index: number) => {
+                    const memberCount = t.memberUserIds?.length || 0;
+                    const isComplete = memberCount === 6;
+                    return (
+                      <tr key={t.name} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.name}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          <span className="font-mono bg-gray-100 rounded px-2 py-1 inline-block">{t.inviteCode}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{t.leaderUserId}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          <div className="flex items-center space-x-2">
+                            <span className="font-medium">{memberCount}/6</span>
+                            <div className="w-16 bg-gray-200 rounded-full h-2">
+                              <div 
+                                className={`h-2 rounded-full transition-all duration-300 ${
+                                  isComplete ? 'bg-green-600' : 'bg-blue-600'
+                                }`}
+                                style={{ width: `${(memberCount / 6) * 100}%` }}
+                              ></div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            isComplete
+                              ? 'bg-green-100 text-green-800'
+                              : memberCount > 0
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}>
+                            {isComplete ? 'Complete' : memberCount > 0 ? 'In Progress' : 'Empty'}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
   )
 }

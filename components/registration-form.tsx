@@ -68,6 +68,10 @@ export default function RegistrationForm() {
     }
   }, [me?.participant]);
 
+  // ...existing code...
+
+  // Move this effect below totalSteps declaration
+
   // Restore local state (before sign-in allowed only limited restoration)
   useEffect(() => {
     try {
@@ -110,6 +114,8 @@ export default function RegistrationForm() {
 
   const totalSteps = 1 /* sign-in */ + sections.length + 1; /* team formation */
 
+  // ...existing code...
+
   function updateField(k: string, v: string) {
     setForm((f) => ({ ...f, [k]: v }));
   }
@@ -143,6 +149,32 @@ export default function RegistrationForm() {
     fetcher,
     { refreshInterval: 8000 }
   );
+
+  useEffect(() => {
+    // Jump to team view if user has a team (this overrides localStorage restoration)
+    if (teamStatus?.team && sessionEmail) {
+      setCurrentStep(totalSteps - 1);
+    }
+  }, [teamStatus?.team, sessionEmail, totalSteps]);
+
+  // Override localStorage step restoration if user has a team
+  useEffect(() => {
+    if (teamStatus?.team) {
+      // If user has a team, force them to team view regardless of localStorage
+      setCurrentStep(totalSteps - 1);
+    } else {
+      // Only restore from localStorage if user doesn't have a team
+      try {
+        const raw = localStorage.getItem(LOCAL_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (typeof parsed.step === "number") {
+            setCurrentStep(parsed.step);
+          }
+        }
+      } catch {}
+    }
+  }, [teamStatus, totalSteps]);
   const loadingParticipant = (typeof loadingMeRaw === 'boolean' ? loadingMeRaw : (!me && !meError));
   const loadingTeam = (typeof loadingTeamRaw === 'boolean' ? loadingTeamRaw : (sessionEmail && !teamStatus));
   const isLeader = !!teamStatus?.team && teamStatus.team.leaderUserId === sessionEmail;
@@ -164,7 +196,15 @@ export default function RegistrationForm() {
         setError(j2.error || "Failed to create team");
         return false;
       }
-      setInfo("Team created successfully");
+      setInfo("Team created successfully! 🎉");
+      // Trigger confetti for team creation
+      setTimeout(() => {
+        try {
+          confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+          setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 } }), 150);
+          setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 } }), 300);
+        } catch {}
+      }, 100);
       await mutateTeam();
     } else if (teamMode === "join") {
       if (!inviteCode.trim()) {
@@ -181,7 +221,15 @@ export default function RegistrationForm() {
         setError(j3.error || "Failed to join team");
         return false;
       }
-      setInfo("Joined team successfully");
+      setInfo("Joined team successfully! 🎉");
+      // Trigger confetti for team joining
+      setTimeout(() => {
+        try {
+          confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+          setTimeout(() => confetti({ particleCount: 80, angle: 60, spread: 55, origin: { x: 0 } }), 150);
+          setTimeout(() => confetti({ particleCount: 80, angle: 120, spread: 55, origin: { x: 1 } }), 300);
+        } catch {}
+      }, 100);
       await mutateTeam();
     }
     await mutateTeam();
@@ -232,35 +280,6 @@ export default function RegistrationForm() {
   const isDone = showCongrats && currentStep === totalSteps;
   const teamLocked = isTeamStep && !!teamStatus?.team;
 
-  // Fire confetti once when finished
-  useEffect(() => {
-    if (isDone) {
-      try {
-        confetti({ particleCount: 180, spread: 70, origin: { y: 0.6 } });
-        setTimeout(
-          () =>
-            confetti({
-              particleCount: 90,
-              angle: 60,
-              spread: 55,
-              origin: { x: 0 },
-            }),
-          180
-        );
-        setTimeout(
-          () =>
-            confetti({
-              particleCount: 90,
-              angle: 120,
-              spread: 55,
-              origin: { x: 1 },
-            }),
-          360
-        );
-      } catch {}
-    }
-  }, [isDone]);
-
   return (
     <div className="w-full max-w-xl mx-auto rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm backdrop-blur">
       <div className="mb-4 flex items-start justify-between gap-4">
@@ -274,14 +293,14 @@ export default function RegistrationForm() {
             </p>
           ) : null}
         </div>
-        <div className="flex items-center gap-2 text-xs text-slate-600">
-          {currentStep > 0 && sessionEmail && (
+        <div className="flex items-center gap-4 text-xs text-slate-600">
+          {sessionEmail && (
             <>
               <span className="hidden sm:inline">{sessionEmail}</span>
               <SignOutButton />
             </>
           )}
-          {currentStep > 0 && !sessionEmail && <GoogleSignInButton />}
+          {!sessionEmail && currentStep > 0 && <GoogleSignInButton />}
         </div>
       </div>
       <div className="mb-6 h-2 w-full overflow-hidden rounded-full bg-slate-100">
@@ -429,59 +448,83 @@ export default function RegistrationForm() {
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-700">Your Team</h3>
-                    {isLeader ? (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (confirm("Delete this team? This cannot be undone.")) {
-                            await fetch("/api/team/status", { method: "DELETE" });
-                            setTeamMode("create");
-                            setTeamName("");
-                            setInviteCode("");
-                            await mutateTeam();
-                          }
-                        }}
-                        className="text-[11px] rounded-md border px-2 py-1 cursor-pointer text-white bg-red-500"
-                      >
-                        Delete Team
-                      </button>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          if (confirm("Exit this team?")) {
-                            const r = await fetch("/api/team/leave", { method: "POST" });
-                            if (r.ok) {
-                              setInfo("Exited team");
+                    <div className="flex items-center gap-2">
+                      {isLeader ? (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (confirm("Delete this team? This cannot be undone.")) {
+                              await fetch("/api/team/status", { method: "DELETE" });
+                              setTeamMode("create");
+                              setTeamName("");
+                              setInviteCode("");
                               await mutateTeam();
-                            } else {
-                              setError("Failed to exit team");
                             }
-                          }
-                        }}
-                        className="text-[11px] rounded-md border px-2 py-1 cursor-pointer text-white bg-amber-500"
-                      >
-                        Exit Team
-                      </button>
-                    )}
+                          }}
+                          className="text-[11px] rounded-md border px-2 py-1 cursor-pointer text-white bg-red-500"
+                        >
+                          Delete Team
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (confirm("Exit this team?")) {
+                              const r = await fetch("/api/team/leave", { method: "POST" });
+                              if (r.ok) {
+                                setInfo("Exited team");
+                                await mutateTeam();
+                              } else {
+                                setError("Failed to exit team");
+                              }
+                            }
+                          }}
+                          className="text-[11px] rounded-md border px-2 py-1 cursor-pointer text-white bg-amber-500"
+                        >
+                          Exit Team
+                        </button>
+                      )}
+                    </div>
                   </div>
                   <p className="text-xs text-slate-600">
                     <span className="font-medium">Name:</span>{" "}
                     {teamStatus.team.name}
                   </p>
-                  <div className="mt-1 rounded-md border bg-white/70 p-3 flex flex-col gap-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-medium text-slate-700">Invite Code</span>
-                      <button type="button" onClick={async ()=>{ try { await navigator.clipboard.writeText(teamStatus.team.inviteCode); setCopied(true); setInfo('Invite code copied'); setTimeout(()=>setCopied(false),1500);} catch { setError('Failed to copy code')} }} className="text-[10px] rounded border px-2 py-0.5 hover:bg-indigo-50 border-indigo-300 text-indigo-600">{copied ? 'Copied' : 'Copy'}</button>
+                  {/* Only show invite code if team is not full (less than 6 members) */}
+                  {(teamStatus.members?.length || 1) < 6 && (
+                    <div className="mt-1 rounded-md border bg-white/70 p-3 flex flex-col gap-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-medium text-slate-700">Invite Code</span>
+                        <button type="button" onClick={async ()=>{ try { await navigator.clipboard.writeText(teamStatus.team.inviteCode); setCopied(true); setInfo('Invite code copied'); setTimeout(()=>setCopied(false),1500);} catch { setError('Failed to copy code')} }} className="text-[10px] rounded border px-2 py-0.5 hover:bg-indigo-50 border-indigo-300 text-indigo-600">{copied ? 'Copied' : 'Copy'}</button>
+                      </div>
+                      <div className="font-mono tracking-wider text-center text-sm text-indigo-700 select-all">{teamStatus.team.inviteCode}</div>
                     </div>
-                    <div className="font-mono tracking-wider text-center text-sm text-indigo-700 select-all">{teamStatus.team.inviteCode}</div>
-                  </div>
+                  )}
+                  {/* Show team full message when team has 6 members */}
+                  {(teamStatus.members?.length || 1) >= 6 && (
+                    <div className="mt-1 rounded-md border border-green-200 bg-green-50 p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="h-2 w-2 rounded-full bg-green-500"></div>
+                        <span className="text-[11px] font-medium text-green-700">Team Complete</span>
+                      </div>
+                      <p className="text-[10px] text-green-600 mt-1">Your team has reached the maximum capacity of 6 members.</p>
+                    </div>
+                  )}
                   <div className="mt-2">
                     <p className="text-[11px] font-medium text-slate-600 mb-1">
                       Members ({teamStatus.members?.length || 1}/6)
                     </p>
                     <ul className="space-y-1">
-                      {(teamStatus.members || []).map((m: any) => {
+                      {(teamStatus.members || [])
+                        .sort((a: any, b: any) => {
+                          // Sort so leader appears first
+                          const aIsLeader = teamStatus.team.leaderUserId === a.email;
+                          const bIsLeader = teamStatus.team.leaderUserId === b.email;
+                          if (aIsLeader && !bIsLeader) return -1;
+                          if (!aIsLeader && bIsLeader) return 1;
+                          return 0;
+                        })
+                        .map((m: any) => {
                         const leader = teamStatus.team.leaderUserId === m.email;
                         return (
                           <li

@@ -34,20 +34,20 @@ export default function Page() {
           <div className="mt-10 flex flex-wrap items-center justify-center gap-6 sm:gap-8 animate-in fade-in slide-in-from-bottom-4 [animation-delay:200ms]">
             {PARTNERS.map((p) => (
               <div key={p.name} className="flex items-center">
-                <Image src={p.logo} alt={p.name} width={44} height={44} className="h-11 w-11 object-contain" />
+                <Image src={p.logo} alt={p.name} width={44} height={44} className="h-18 w-18 object-contain" />
               </div>
             ))}
           </div>
           <a
             href="#register"
-            className="mt-14 inline-flex items-center gap-2 rounded-full border border-blue-600/30 bg-white/80 px-6 py-3 text-sm font-semibold text-blue-700 shadow-sm shadow-blue-500/10 backdrop-blur transition hover:-translate-y-0.5 hover:border-blue-600 hover:bg-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+            className="mt-8 inline-flex items-center gap-2 rounded-full border border-blue-600/30 bg-white/80 px-6 py-3 text-sm font-semibold text-blue-700 shadow-sm shadow-blue-500/10 backdrop-blur transition hover:-translate-y-0.5 hover:border-blue-600 hover:bg-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
           >
             Begin Registration
             <span aria-hidden className="inline-block animate-bounce">↘</span>
           </a>
         </div>
-        <div className="absolute bottom-6 left-1/2 hidden -translate-x-1/2 md:block">
-          <span className="text-xs uppercase tracking-wider text-slate-500">Scroll</span>
+        <div className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 md:block">
+          <span className="text-sm uppercase tracking-wider text-slate-500">Scroll</span>
         </div>
       </section>
 
@@ -85,8 +85,8 @@ export default function Page() {
 }
 
 const PARTNERS = [
-  { name: 'Partner A', logo: '/placeholder-logo.png' },
-  { name: 'Partner B', logo: '/placeholder-logo.png' },
-  { name: 'Partner C', logo: '/placeholder-logo.png' },
-  { name: 'Partner D', logo: '/placeholder-logo.png' },
+  { name: 'Partner A', logo: '/MulearnUCEK.png' },
+  { name: 'Partner B', logo: '/IEDC.png' },
+  { name: 'Partner C', logo: '/Foss.png' },
+  { name: 'Partner D', logo: '/logo.png' },
 ]
