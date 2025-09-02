@@ -54,6 +54,10 @@ export default function RegistrationForm() {
   const sessionEmail = me?.sessionUser?.email as string | undefined;
   const [showCongrats, setShowCongrats] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  // WhatsApp community prompt visibility
+  const [showWhatsAppPrompt, setShowWhatsAppPrompt] = useState(true);
+  // Secondary prompt after team completion
+  const [showWhatsAppTeamPrompt, setShowWhatsAppTeamPrompt] = useState(true);
   const LOCAL_KEY = "sih-reg-state-v1";
 
   useEffect(() => {
@@ -277,8 +281,20 @@ export default function RegistrationForm() {
   const fieldStepsEnd = fieldStepsStart + sections.length - 1;
 
   const isTeamStep = currentStep === totalSteps - 1;
-  const isDone = showCongrats && currentStep === totalSteps;
+  const isDone = showCongrats && currentStep === totalSteps && (teamStatus.members?.length || 1) >= 6 ;
   const teamLocked = isTeamStep && !!teamStatus?.team;
+
+  // Persist / restore dismissal of WhatsApp prompt
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('sih-wa-dismissed') === '1') {
+        setShowWhatsAppPrompt(false);
+      }
+      if (localStorage.getItem('sih-wa-dismissed-team') === '1') {
+        setShowWhatsAppTeamPrompt(false);
+      }
+    } catch {}
+  }, []);
 
   return (
     <div className="w-full max-w-xl mx-auto rounded-2xl border border-slate-200 bg-white/80 p-6 shadow-sm backdrop-blur">
@@ -525,6 +541,29 @@ export default function RegistrationForm() {
                         </a>
                         <p className="text-[9px] text-green-600 mt-1">Browse official problem statements for Smart India Hackathon 2025</p>
                       </div>
+
+                      {/* WhatsApp community prompt after team completion */}
+                        <div className="mt-4 rounded-md border border-emerald-300 bg-emerald-50 p-3">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-[11px] font-semibold text-emerald-800">Stay Connected</p>
+                              <p className="text-[10px] text-emerald-700 mt-1 leading-relaxed max-w-sm">Join our WhatsApp community for critical updates, resources, and coordination tips as you prepare your submission.</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <a
+                              href="https://chat.whatsapp.com/F9cJqS4W0YiHFi6naaqrok"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium px-3 py-1.5"
+                            >
+                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2a10 10 0 00-8.94 14.5L2 22l5.7-1.99A10 10 0 1012 2zm0 2a8 8 0 110 16 7.96 7.96 0 01-3.65-.88l-.26-.14-3.38 1.18 1.16-3.3-.17-.28A8 8 0 0112 4zm4.24 9.71c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1-.37-1.9-1.18-.7-.62-1.18-1.38-1.32-1.62-.14-.24-.02-.36.1-.48.1-.1.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.48-.4-.42-.54-.42-.14 0-.3 0-.46 0-.16 0-.42.06-.64.3-.22.24-.86.84-.86 2.04 0 1.2.88 2.36 1 2.52.12.16 1.72 2.62 4.16 3.68.58.26 1.04.42 1.4.54.58.18 1.1.16 1.52.1.46-.06 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z" />
+                              </svg>
+                              Join WhatsApp Group
+                            </a>
+                          </div>
+                        </div>
                     </div>
                   )}
                   <div className="mt-2">
@@ -565,7 +604,29 @@ export default function RegistrationForm() {
                 </div>
               </div>
             ) : (!loadingTeam && (
-              <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-4">
+                {showWhatsAppPrompt && (
+                  <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 space-y-3 animate-in fade-in">
+                    <div>
+                      <p className="text-sm font-semibold text-emerald-800">Join Our WhatsApp Community</p>
+                      <p className="text-[11px] text-emerald-700 mt-1 leading-relaxed">
+                        Stay updated with announcements, resources, and networking opportunities for SIH 2025 participants while you form your team.
+                      </p>
+                    </div>
+                    <a
+                      href="https://chat.whatsapp.com/F9cJqS4W0YiHFi6naaqrok"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex w-fit items-center gap-2 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium px-4 py-2 shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                    >
+                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2a10 10 0 00-8.94 14.5L2 22l5.7-1.99A10 10 0 1012 2zm0 2a8 8 0 110 16 7.96 7.96 0 01-3.65-.88l-.26-.14-3.38 1.18 1.16-3.3-.17-.28A8 8 0 0112 4zm4.24 9.71c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1-.37-1.9-1.18-.7-.62-1.18-1.38-1.32-1.62-.14-.24-.02-.36.1-.48.1-.1.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.48-.4-.42-.54-.42-.14 0-.3 0-.46 0-.16 0-.42.06-.64.3-.22.24-.86.84-.86 2.04 0 1.2.88 2.36 1 2.52.12.16 1.72 2.62 4.16 3.68.58.26 1.04.42 1.4.54.58.18 1.1.16 1.52.1.46-.06 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z" />
+                      </svg>
+                      Join WhatsApp Group
+                    </a>
+                  </div>
+                )}
+                <div className="grid gap-4 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => setTeamMode("create")}
@@ -618,6 +679,7 @@ export default function RegistrationForm() {
                     </div>
                   )}
                 </button>
+                </div>
               </div>
             ))}
             <p className="text-[11px] text-slate-500 leading-relaxed">
