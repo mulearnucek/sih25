@@ -2,9 +2,9 @@ import NextAuth, { NextAuthOptions } from "next-auth"
 import Google from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 
-// Admin credentials
-const ADMIN_EMAIL = "admin@sih25.com"
-const ADMIN_PASSWORD = "SIH2025@Admin"
+// Admin credentials from environment
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@sih25.com";
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "SIH2025@Admin";
 
 // Shared NextAuth configuration (works for current v5 API; fallback logic added for v4)
 export const authOptions: NextAuthOptions = {
@@ -17,7 +17,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (credentials?.email === ADMIN_EMAIL && credentials?.password === ADMIN_PASSWORD) {
+  if (credentials?.email === ADMIN_EMAIL && credentials?.password === ADMIN_PASSWORD) {
           return {
             id: "admin",
             email: ADMIN_EMAIL,

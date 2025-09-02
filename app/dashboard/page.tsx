@@ -1,18 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import BroadcastForm from "@/components/broadcast-form";
-import AdminLogin from "@/components/admin-login";
+import { useSession, signIn, signOut } from "next-auth/react";
+import type { Session } from "next-auth";
 
-// Simple admin credentials - in production, use proper authentication
-const ADMIN_CREDENTIALS = {
-  email: "admin@example.com",
-  password: "admin123"
-};
 
 export default function DashboardPage() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loginLoading, setLoginLoading] = useState(false);
+
+  const { data: sessionRaw, status } = useSession();
+  // Patch session type to include isAdmin
+  const session = sessionRaw as (Session & { user?: { isAdmin?: boolean } });
   const [participants, setParticipants] = useState([]);
   const [teams, setTeams] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,78 +17,27 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Check if user is already authenticated on component mount
-  useEffect(() => {
-    const authStatus = localStorage.getItem('adminAuthenticated');
-    if (authStatus === 'true') {
-      setIsAuthenticated(true);
-    }
-  }, []);
 
-  const handleLogin = async (email: string, password: string) => {
-    setLoginLoading(true);
-    setLoginError(null);
-
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    if (email === ADMIN_CREDENTIALS.email && password === ADMIN_CREDENTIALS.password) {
-      setIsAuthenticated(true);
-      localStorage.setItem('adminAuthenticated', 'true');
-      setLoginError(null);
-    } else {
-      setLoginError("Invalid email or password");
-    }
-
-    setLoginLoading(false);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    localStorage.removeItem('adminAuthenticated');
-  };
+  // NextAuth handles login
 
   const fetchData = async () => {
-    if (!isAuthenticated) return;
-    
+    if (!session || !session.user?.isAdmin) return;
     try {
       setError(null);
       setLoading(true);
       const [pRes, tRes] = await Promise.all([
-        fetch("/api/dashboard/participants", { 
-          cache: "no-store",
-          credentials: 'include'
-        }),
-        fetch("/api/dashboard/teams", { 
-          cache: "no-store",
-          credentials: 'include'
-        }),
+        fetch("/api/dashboard/participants", { cache: "no-store", credentials: "include" }),
+        fetch("/api/dashboard/teams", { cache: "no-store", credentials: "include" }),
       ]);
-      
-      if (!pRes.ok) {
-        const errorData = await pRes.json();
-        console.error('Participants API error:', errorData);
-        throw new Error(`Failed to fetch participants: ${errorData.error || pRes.statusText}`);
-      }
-      
-      if (!tRes.ok) {
-        const errorData = await tRes.json();
-        console.error('Teams API error:', errorData);
-        throw new Error(`Failed to fetch teams: ${errorData.error || tRes.statusText}`);
-      }
-      
+      if (!pRes.ok) throw new Error("Failed to fetch participants");
+      if (!tRes.ok) throw new Error("Failed to fetch teams");
       const participantsData = await pRes.json();
       const teamsData = await tRes.json();
-      
-      console.log('Participants data:', participantsData);
-      console.log('Teams data:', teamsData);
-      
       setParticipants(participantsData.participants || []);
       setTeams(teamsData.teams || []);
       setLastUpdated(new Date());
     } catch (error) {
-      console.error('Failed to fetch data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch data');
+      setError(error instanceof Error ? error.message : "Failed to fetch data");
     } finally {
       setLoading(false);
     }
@@ -99,17 +45,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchData();
-  }, [isAuthenticated]);
+  }, [session]);
 
-  // Show login form if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <AdminLogin 
-        onLogin={handleLogin}
-        error={loginError}
-        loading={loginLoading}
-      />
-    );
+  // Show login form if not authenticated or not admin
+  if (status === "loading") {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+  if (!session || !session.user?.isAdmin) {
+    if (typeof window !== "undefined") {
+      window.location.href = "/api/auth/signin?callbackUrl=/dashboard";
+    }
+    return null;
   }
 
   // Calculate statistics
@@ -146,47 +92,7 @@ export default function DashboardPage() {
       Math.round((participants.filter((p: any) => p.teamStatus?.hasTeam).length / participants.length) * 100) : 0
   };
 
-  console.log('Current stats:', stats);
-  console.log('Participants:', participants);
-  console.log('Teams:', teams);
-  
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-lg border p-8">
-          <div className="flex items-center space-x-4">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            <span className="text-gray-700 font-medium">Loading dashboard...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="bg-white rounded-xl shadow-lg border p-8 max-w-md text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Dashboard</h1>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="inline-flex items-center px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors duration-200"
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
+  // ...existing code...
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -211,7 +117,7 @@ export default function DashboardPage() {
             <div className="flex items-center space-x-4">
               <div className="text-right">
                 <p className="text-sm font-medium text-gray-900">Admin User</p>
-                <p className="text-xs text-gray-500">{ADMIN_CREDENTIALS.email}</p>
+                <p className="text-xs text-gray-500">{session.user?.email}</p>
               </div>
               <button 
                 onClick={fetchData}
@@ -233,7 +139,7 @@ export default function DashboardPage() {
                 Export Data
               </a>
               <button 
-                onClick={handleLogout}
+                onClick={() => signOut()}
                 className="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors duration-200"
                 title="Logout"
               >
@@ -585,5 +491,5 @@ export default function DashboardPage() {
         )}
       </main>
     </div>
-  )
+  );
 }

@@ -3,10 +3,15 @@ import * as XLSX from "xlsx"
 import { connectMongoose } from "@/lib/mongoose"
 import Participant from "@/models/participant"
 import Team from "@/models/team"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 
 export async function GET() {
-  // Simple authentication removed for basic dashboard access
-  // In production, you might want to add proper API authentication
+  const sessionRaw = await getServerSession(authOptions);
+  const session = sessionRaw as { user?: { isAdmin?: boolean } };
+  if (!session || !session.user?.isAdmin) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
   await connectMongoose()
   const participantsRaw = await Participant.find({}, { _id: 0, __v: 0 }).lean()
