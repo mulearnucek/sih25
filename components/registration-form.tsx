@@ -516,7 +516,7 @@ export default function RegistrationForm() {
                       <div className="font-mono tracking-wider text-center text-sm text-indigo-700 select-all">{teamStatus.team.inviteCode}</div>
                     </div>
                   )}
-                  {/* Show team full message when team has 6 members */}
+                  {/* Team full message (only when complete) */}
                   {(teamStatus.members?.length || 1) >= 6 && (
                     <div className="mt-1 rounded-md border border-green-200 bg-green-50 p-3">
                       <div className="flex items-center gap-2">
@@ -524,13 +524,11 @@ export default function RegistrationForm() {
                         <span className="text-[11px] font-medium text-green-700">Team Complete</span>
                       </div>
                       <p className="text-[10px] text-green-600 mt-1">Your team has reached the maximum capacity of 6 members.</p>
-                      
-                      {/* Problem Statement Link */}
                       <div className="mt-3 pt-2 border-t border-green-200">
                         <p className="text-[10px] text-green-700 font-medium mb-2">🚀 Next Step: Choose Your Problem Statement</p>
-                        <a 
-                          href="https://sih.gov.in/sih2025PS" 
-                          target="_blank" 
+                        <a
+                          href="https://sih.gov.in/sih2025PS"
+                          target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-[10px] bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded-md transition-colors"
                         >
@@ -541,31 +539,30 @@ export default function RegistrationForm() {
                         </a>
                         <p className="text-[9px] text-green-600 mt-1">Browse official problem statements for Smart India Hackathon 2025</p>
                       </div>
-
-                      {/* WhatsApp community prompt after team completion */}
-                        <div className="mt-4 rounded-md border border-emerald-300 bg-emerald-50 p-3">
-                          <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="text-[11px] font-semibold text-emerald-800">Stay Connected</p>
-                              <p className="text-[10px] text-emerald-700 mt-1 leading-relaxed max-w-sm">Join our WhatsApp community for critical updates, resources, and coordination tips as you prepare your submission.</p>
-                            </div>
-                          </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <a
-                              href="https://chat.whatsapp.com/F9cJqS4W0YiHFi6naaqrok"
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium px-3 py-1.5"
-                            >
-                              <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 2a10 10 0 00-8.94 14.5L2 22l5.7-1.99A10 10 0 1012 2zm0 2a8 8 0 110 16 7.96 7.96 0 01-3.65-.88l-.26-.14-3.38 1.18 1.16-3.3-.17-.28A8 8 0 0112 4zm4.24 9.71c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1-.37-1.9-1.18-.7-.62-1.18-1.38-1.32-1.62-.14-.24-.02-.36.1-.48.1-.1.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.48-.4-.42-.54-.42-.14 0-.3 0-.46 0-.16 0-.42.06-.64.3-.22.24-.86.84-.86 2.04 0 1.2.88 2.36 1 2.52.12.16 1.72 2.62 4.16 3.68.58.26 1.04.42 1.4.54.58.18 1.1.16 1.52.1.46-.06 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z" />
-                              </svg>
-                              Join WhatsApp Group
-                            </a>
-                          </div>
-                        </div>
                     </div>
                   )}
+                  {/* WhatsApp community prompt (always visible when in a team) */}
+                  <div className="mt-4 rounded-md border border-emerald-300 bg-emerald-50 p-3">
+                    <div className="flex items-start gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold text-emerald-800">Stay Connected</p>
+                        <p className="text-[10px] text-emerald-700 mt-1 leading-relaxed max-w-sm">Join our WhatsApp community for critical updates, resources, and coordination tips as you prepare your submission.</p>
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <a
+                        href="https://chat.whatsapp.com/F9cJqS4W0YiHFi6naaqrok"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium px-3 py-1.5"
+                      >
+                        <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2a10 10 0 00-8.94 14.5L2 22l5.7-1.99A10 10 0 1012 2zm0 2a8 8 0 110 16 7.96 7.96 0 01-3.65-.88l-.26-.14-3.38 1.18 1.16-3.3-.17-.28A8 8 0 0112 4zm4.24 9.71c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1-.37-1.9-1.18-.7-.62-1.18-1.38-1.32-1.62-.14-.24-.02-.36.1-.48.1-.1.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.2-.48-.4-.42-.54-.42-.14 0-.3 0-.46 0-.16 0-.42.06-.64.3-.22.24-.86.84-.86 2.04 0 1.2.88 2.36 1 2.52.12.16 1.72 2.62 4.16 3.68.58.26 1.04.42 1.4.54.58.18 1.1.16 1.52.1.46-.06 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28z" />
+                        </svg>
+                        Join WhatsApp Group
+                      </a>
+                    </div>
+                  </div>
                   <div className="mt-2">
                     <p className="text-[11px] font-medium text-slate-600 mb-1">
                       Members ({teamStatus.members?.length || 1}/6)
@@ -605,7 +602,6 @@ export default function RegistrationForm() {
               </div>
             ) : (!loadingTeam && (
               <div className="space-y-4">
-                {showWhatsAppPrompt && (
                   <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-4 space-y-3 animate-in fade-in">
                     <div>
                       <p className="text-sm font-semibold text-emerald-800">Join Our WhatsApp Community</p>
@@ -625,7 +621,6 @@ export default function RegistrationForm() {
                       Join WhatsApp Group
                     </a>
                   </div>
-                )}
                 <div className="grid gap-4 sm:grid-cols-2">
                 <button
                   type="button"
