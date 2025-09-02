@@ -60,7 +60,7 @@
     "mongodb-client-encryption": "latest",
     "mongoose": "latest",
     "next": "15.2.4",
-    "next-auth": "latest",
+    "next-auth": "^4.24.11",
     "next-themes": "latest",
     "nodemailer": "latest",
     "react": "^19",
