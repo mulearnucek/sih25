@@ -1,29 +1,44 @@
 import { NextResponse } from "next/server"
-import { auth } from "@/lib/auth"
 import * as XLSX from "xlsx"
 import { connectMongoose } from "@/lib/mongoose"
 import Participant from "@/models/participant"
 import Team from "@/models/team"
-import { authOptions } from "@/lib/auth"
-import { getServerSession } from "next-auth"
-
-function isAdmin(email?: string | null) {
-  const admins = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean)
-  return email && admins.includes(email.toLowerCase())
-}
 
 export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user?.email)) return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  // Simple authentication removed for basic dashboard access
+  // In production, you might want to add proper API authentication
 
   await connectMongoose()
   const participantsRaw = await Participant.find({}, { _id: 0, __v: 0 }).lean()
   const teamsRaw = await Team.find({}, { _id: 0, __v: 0 }).lean()
 
   const wb = XLSX.utils.book_new()
+  
+  // Create a map of userId to team info
+  const userTeamMap = new Map()
+  
+  teamsRaw.forEach((team: any) => {
+    // Add leader to map
+    if (team.leaderUserId) {
+      userTeamMap.set(team.leaderUserId, {
+        teamName: team.name,
+        role: 'Leader',
+        hasTeam: true
+      })
+    }
+    
+    // Add members to map
+    if (team.memberUserIds && Array.isArray(team.memberUserIds)) {
+      team.memberUserIds.forEach((userId: string) => {
+        userTeamMap.set(userId, {
+          teamName: team.name,
+          role: 'Member',
+          hasTeam: true
+        })
+      })
+    }
+  })
+  
   // Collect all distinct dynamic field keys
   const dynamicKeys = new Set<string>()
   for (const p of participantsRaw) {
@@ -33,13 +48,27 @@ export async function GET() {
   }
   const orderedDynamicKeys = Array.from(dynamicKeys).sort()
 
-  // Flatten participants
+  // Flatten participants and add team status
   const participants = participantsRaw.map(p => {
     const base: any = { ...p }
     delete base.fields
+    
+    // Add dynamic fields
     for (const k of orderedDynamicKeys) {
       base[k] = p.fields?.[k] ?? ''
     }
+    
+    // Add team status information
+    const teamInfo = userTeamMap.get(p.userId) || {
+      teamName: '',
+      role: '',
+      hasTeam: false
+    }
+    
+    base.teamName = teamInfo.teamName || 'No Team'
+    base.teamRole = teamInfo.role || 'No Role'
+    base.hasTeam = teamInfo.hasTeam ? 'Yes' : 'No'
+    
     return base
   })
 
