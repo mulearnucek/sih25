@@ -13,7 +13,7 @@ A team registration and management platform for Smart India Hackathon 2025.
 
 ### 1. Install
 ```bash
-git clone https://github.com/ABHISHEK2k6/sih25.git
+git clone https://github.com/mulearnucek/sih25.git
 cd sih25
 npm install
 ```
