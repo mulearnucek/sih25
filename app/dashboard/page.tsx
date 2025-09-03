@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import BroadcastForm from "@/components/broadcast-form";
 import { useSession, signIn, signOut } from "next-auth/react";
 import type { Session } from "next-auth";
@@ -16,9 +16,41 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
 
 
   // NextAuth handles login
+
+  const getTeamMembers = (team: any) => {
+    const members: any[] = [];
+    
+    // Add leader
+    if (team.leaderUserId) {
+      const leader = participants.find((p: any) => p.email === team.leaderUserId);
+      if (leader && typeof leader === 'object') {
+        members.push(Object.assign({}, leader, { role: 'Leader' }));
+      }
+    }
+    
+    // Add members (excluding the leader to avoid duplication)
+    if (team.memberUserIds && team.memberUserIds.length > 0) {
+      team.memberUserIds.forEach((memberId: string) => {
+        // Only add if this member is not the leader
+        if (memberId !== team.leaderUserId) {
+          const member = participants.find((p: any) => p.email === memberId);
+          if (member && typeof member === 'object') {
+            members.push(Object.assign({}, member, { role: 'Member' }));
+          }
+        }
+      });
+    }
+    
+    return members;
+  };
+
+  const toggleTeamExpansion = (teamName: string) => {
+    setExpandedTeam(expandedTeam === teamName ? null : teamName);
+  };
 
   const fetchData = async () => {
     if (!session || !session.user?.isAdmin) return;
@@ -63,30 +95,41 @@ export default function DashboardPage() {
     totalParticipants: participants.length,
     totalTeams: teams.length,
     completeTeams: teams.filter((t: any) => {
-      const memberCount = (t.memberUserIds?.length || 0) + (t.leaderUserId ? 1 : 0);
-      return memberCount === 6;
+      // Count leader (if exists) + members (excluding leader to avoid double counting)
+      const leaderCount = t.leaderUserId ? 1 : 0;
+      const memberCount = t.memberUserIds ? t.memberUserIds.filter((id: string) => id !== t.leaderUserId).length : 0;
+      const totalMembers = leaderCount + memberCount;
+      return totalMembers === 6;
     }).length,
     incompleteTeams: teams.filter((t: any) => {
-      const memberCount = (t.memberUserIds?.length || 0) + (t.leaderUserId ? 1 : 0);
-      return memberCount > 0 && memberCount < 6;
+      const leaderCount = t.leaderUserId ? 1 : 0;
+      const memberCount = t.memberUserIds ? t.memberUserIds.filter((id: string) => id !== t.leaderUserId).length : 0;
+      const totalMembers = leaderCount + memberCount;
+      return totalMembers > 0 && totalMembers < 6;
     }).length,
     emptyTeams: teams.filter((t: any) => {
-      const memberCount = (t.memberUserIds?.length || 0) + (t.leaderUserId ? 1 : 0);
-      return memberCount === 0;
+      const leaderCount = t.leaderUserId ? 1 : 0;
+      const memberCount = t.memberUserIds ? t.memberUserIds.filter((id: string) => id !== t.leaderUserId).length : 0;
+      const totalMembers = leaderCount + memberCount;
+      return totalMembers === 0;
     }).length,
     participantsInTeams: participants.filter((p: any) => p.teamStatus?.hasTeam).length,
     participantsWithoutTeams: participants.filter((p: any) => !p.teamStatus?.hasTeam).length,
     averageTeamSize: teams.length > 0 ? 
       Math.round(
         teams.reduce((acc: number, t: any) => {
-          const memberCount = (t.memberUserIds?.length || 0) + (t.leaderUserId ? 1 : 0);
-          return acc + memberCount;
+          const leaderCount = t.leaderUserId ? 1 : 0;
+          const memberCount = t.memberUserIds ? t.memberUserIds.filter((id: string) => id !== t.leaderUserId).length : 0;
+          const totalMembers = leaderCount + memberCount;
+          return acc + totalMembers;
         }, 0) / teams.length * 10
       ) / 10 : 0,
     teamCompletionRate: teams.length > 0 ? 
       Math.round((teams.filter((t: any) => {
-        const memberCount = (t.memberUserIds?.length || 0) + (t.leaderUserId ? 1 : 0);
-        return memberCount === 6;
+        const leaderCount = t.leaderUserId ? 1 : 0;
+        const memberCount = t.memberUserIds ? t.memberUserIds.filter((id: string) => id !== t.leaderUserId).length : 0;
+        const totalMembers = leaderCount + memberCount;
+        return totalMembers === 6;
       }).length / teams.length) * 100) : 0,
     participantRegistrationRate: participants.length > 0 ? 
       Math.round((participants.filter((p: any) => p.teamStatus?.hasTeam).length / participants.length) * 100) : 0
@@ -434,6 +477,7 @@ export default function DashboardPage() {
                 <span className="w-8 h-8 bg-gray-900 rounded-lg flex items-center justify-center text-white text-sm mr-3">🏆</span>
                 Teams ({teams.length})
               </h2>
+              <p className="text-sm text-gray-500 mt-1">Click on a team row to view members</p>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -444,44 +488,122 @@ export default function DashboardPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Leader</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Members</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {teams.map((t: any, index: number) => {
-                    const memberCount = t.memberUserIds?.length || 0;
+                    // Calculate actual member count (leader + members, avoiding double counting)
+                    const leaderCount = t.leaderUserId ? 1 : 0;
+                    const actualMemberCount = t.memberUserIds ? t.memberUserIds.filter((id: string) => id !== t.leaderUserId).length : 0;
+                    const memberCount = leaderCount + actualMemberCount;
                     const isComplete = memberCount === 6;
+                    const isExpanded = expandedTeam === t.name;
+                    const teamMembers = getTeamMembers(t);
+                    
                     return (
-                      <tr key={t.name} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{t.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <span className="font-mono bg-gray-100 rounded px-2 py-1 inline-block">{t.inviteCode}</span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{t.leaderUserId}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          <div className="flex items-center space-x-2">
-                            <span className="font-medium">{memberCount}/6</span>
-                            <div className="w-16 bg-gray-200 rounded-full h-2">
-                              <div 
-                                className={`h-2 rounded-full transition-all duration-300 ${
-                                  isComplete ? 'bg-green-600' : 'bg-blue-600'
+                      <React.Fragment key={t.name}>
+                        <tr 
+                          className={`cursor-pointer transition-colors duration-150 ${
+                            index % 2 === 0 ? 'bg-white hover:bg-gray-50' : 'bg-gray-50 hover:bg-gray-100'
+                          } ${isExpanded ? 'bg-blue-50' : ''}`}
+                          onClick={() => toggleTeamExpansion(t.name)}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            <div className="flex items-center">
+                              <svg 
+                                className={`w-4 h-4 mr-2 transition-transform duration-200 ${
+                                  isExpanded ? 'transform rotate-90' : ''
                                 }`}
-                                style={{ width: `${(memberCount / 6) * 100}%` }}
-                              ></div>
+                                fill="none" 
+                                stroke="currentColor" 
+                                viewBox="0 0 24 24"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                              </svg>
+                              {t.name}
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            isComplete
-                              ? 'bg-green-100 text-green-800'
-                              : memberCount > 0
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {isComplete ? 'Complete' : memberCount > 0 ? 'In Progress' : 'Empty'}
-                          </span>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            <span className="font-mono bg-gray-100 rounded px-2 py-1 inline-block">{t.inviteCode}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{t.leaderUserId}</td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium">{memberCount}/6</span>
+                              <div className="w-16 bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className={`h-2 rounded-full transition-all duration-300 ${
+                                    isComplete ? 'bg-green-600' : 'bg-blue-600'
+                                  }`}
+                                  style={{ width: `${(memberCount / 6) * 100}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              isComplete
+                                ? 'bg-green-100 text-green-800'
+                                : memberCount > 0
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-gray-100 text-gray-800'
+                            }`}>
+                              {isComplete ? 'Complete' : memberCount > 0 ? 'In Progress' : 'Empty'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <span className="text-gray-400">
+                              {isExpanded ? 'Click to collapse' : 'Click to expand'}
+                            </span>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan={6} className="px-6 py-0">
+                              <div className="bg-gray-50 border-t border-gray-200 px-6 py-4">
+                                <h4 className="text-sm font-medium text-gray-900 mb-3">Team Members ({teamMembers.length})</h4>
+                                {teamMembers.length > 0 ? (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {teamMembers.map((member: any, memberIndex: number) => (
+                                      <div 
+                                        key={`${member.email}-${memberIndex}`}
+                                        className="bg-white rounded-lg border border-gray-200 p-3 shadow-sm"
+                                      >
+                                        <div className="flex items-center justify-between mb-2">
+                                          <span className="text-sm font-medium text-gray-900">{member.name}</span>
+                                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                            member.role === 'Leader' 
+                                              ? 'bg-blue-100 text-blue-800' 
+                                              : 'bg-green-100 text-green-800'
+                                          }`}>
+                                            {member.role}
+                                          </span>
+                                        </div>
+                                        <div className="space-y-1 text-xs text-gray-600">
+                                          <div><span className="font-medium">Email:</span> {member.email}</div>
+                                          <div><span className="font-medium">Phone:</span> {member.fields?.phone || 'N/A'}</div>
+                                          <div><span className="font-medium">Department:</span> {member.fields?.department || 'N/A'}</div>
+                                          <div><span className="font-medium">Year:</span> {member.fields?.year || 'N/A'}</div>
+                                          <div><span className="font-medium">Gender:</span> {member.gender || 'N/A'}</div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-center py-8">
+                                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                                    </svg>
+                                    <h3 className="mt-2 text-sm font-medium text-gray-900">No members yet</h3>
+                                    <p className="mt-1 text-sm text-gray-500">This team doesn't have any members yet.</p>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })}
                 </tbody>
