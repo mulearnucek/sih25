@@ -11,6 +11,9 @@ A team registration and management platform for Smart India Hackathon 2025. Buil
 - Join request notifications
 
 ## � Quick Setup
+- Admin dashboard with data export
+- Join request notifications
+
 
 ### 1. Install
 ```bash
@@ -69,12 +72,17 @@ Access dashboard at `/dashboard` with admin credentials to:
 - Send announcements
 
 ## �️ Tech Stack
+=======
 
 - **Frontend**: Next.js, React, Tailwind CSS
 - **Authentication**: NextAuth with Google OAuth
 - **Database**: MongoDB with Mongoose
 - **Deployment**: Vercel recommended
 
----
+
+
+**Built for Smart India Hackathon 2025** 🚀
+- **Deployment**: Vercel or Netlify
+
 
 **Built for Smart India Hackathon 2025** 🚀
