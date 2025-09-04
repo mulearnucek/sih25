@@ -65,7 +65,7 @@ export default function Page() {
             <ol className="space-y-3 [counter-reset:step]">
               {[
                 'Individual Registration (closes on 15 Sept)',
-                'Form a Team of 6 members (atleast 1 female team member)',
+                'Form a Team of 6 members (atleast 1 female team member) - Use Team Discovery from registration to find teammates!',
                 'Select Problem Statement - Choose a problem statement from SIH',
                 'Kickoff & Mentorship - Meet your team & assigned mentor',
                 'Idea Development - Guided sessions + mentor support',

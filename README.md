@@ -1,15 +1,19 @@
 # SIH 2025 Team Registration Platform
 
-A team registration and management platform for Smart India Hackathon 2025.
+A team registration and management platform for Smart India Hackathon 2025. Built with Next.js, NextAuth, and MongoDB.
 
 ## ✨ Features
 
 - Google OAuth authentication
 - Team creation and management  
+- Team discovery with WhatsApp integration
 - Admin dashboard with data export
 - Join request notifications
 
-##   Quick Setup
+## � Quick Setup
+- Admin dashboard with data export
+- Join request notifications
+
 
 ### 1. Install
 ```bash
@@ -25,6 +29,7 @@ MONGODB_URI=your_mongodb_connection_string
 AUTH_GOOGLE_ID=your_google_client_id
 AUTH_GOOGLE_SECRET=your_google_client_secret
 NEXTAUTH_SECRET=your_nextauth_secret
+NEXT_PUBLIC_ADMIN_EMAILS=admin@college.edu
 ADMIN_EMAIL=admin@college
 ADMIN_PASSWORD=your_password
 ```
@@ -64,14 +69,20 @@ Access dashboard at `/dashboard` with admin credentials to:
 - View all registrations
 - Monitor team formation
 - Export participant data
+- Send announcements
 
-##  ️ Tech Stack
+## �️ Tech Stack
+=======
 
 - **Frontend**: Next.js, React, Tailwind CSS
 - **Authentication**: NextAuth with Google OAuth
 - **Database**: MongoDB with Mongoose
+- **Deployment**: Vercel recommended
+
+
+
+**Built for Smart India Hackathon 2025** 🚀
 - **Deployment**: Vercel or Netlify
 
----
 
 **Built for Smart India Hackathon 2025** 🚀

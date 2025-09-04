@@ -12,6 +12,7 @@ import {
 } from "react";
 import { DynamicField } from "./dynamic-field";
 import { GoogleSignInButton, SignOutButton } from "./auth-buttons";
+import NotificationBell from "./notification-bell";
 import { signIn } from "next-auth/react";
 import confetti from "canvas-confetti";
 
@@ -133,6 +134,7 @@ export default function RegistrationForm() {
 
   async function saveParticipant() {
     if (!sessionEmail) return;
+    
     const r1 = await fetch("/api/participant", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -466,21 +468,24 @@ export default function RegistrationForm() {
                     <h3 className="text-sm font-semibold text-slate-700">Your Team</h3>
                     <div className="flex items-center gap-2">
                       {isLeader ? (
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            if (confirm("Delete this team? This cannot be undone.")) {
-                              await fetch("/api/team/status", { method: "DELETE" });
-                              setTeamMode("create");
-                              setTeamName("");
-                              setInviteCode("");
-                              await mutateTeam();
-                            }
-                          }}
-                          className="text-[11px] rounded-md border px-2 py-1 cursor-pointer text-white bg-red-500"
-                        >
-                          Delete Team
-                        </button>
+                        <>
+                          <NotificationBell />
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (confirm("Delete this team? This cannot be undone.")) {
+                                await fetch("/api/team/status", { method: "DELETE" });
+                                setTeamMode("create");
+                                setTeamName("");
+                                setInviteCode("");
+                                await mutateTeam();
+                              }
+                            }}
+                            className="text-[11px] rounded-md border px-2 py-1 cursor-pointer text-white bg-red-500"
+                          >
+                            Delete Team
+                          </button>
+                        </>
                       ) : (
                         <button
                           type="button"
@@ -621,7 +626,7 @@ export default function RegistrationForm() {
                       Join WhatsApp Group
                     </a>
                   </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => setTeamMode("create")}
@@ -674,6 +679,26 @@ export default function RegistrationForm() {
                     </div>
                   )}
                 </button>
+                <a
+                  href="/team-discovery"
+                  className="group relative rounded-xl border border-slate-200 hover:border-slate-300 p-4 text-left transition hover:shadow"
+                >
+                  <div className="mb-2 flex items-center justify-between">
+                    <span className="text-sm font-semibold text-slate-700">
+                      Find Teams
+                    </span>
+                    <span className="text-xs text-indigo-600">Discovery</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Browse available teams & teammates.
+                  </p>
+                  <div className="mt-3 flex items-center gap-1 text-indigo-600">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span className="text-[10px] font-medium">Explore →</span>
+                  </div>
+                </a>
                 </div>
               </div>
             ))}

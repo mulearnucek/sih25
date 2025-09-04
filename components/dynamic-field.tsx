@@ -3,7 +3,7 @@
 type Field = {
   key: string
   label: string
-  type: "text" | "select"
+  type: "text" | "select" | "textarea"
   required?: boolean
   options?: string[]
   placeholder?: string
@@ -40,6 +40,16 @@ export function DynamicField({
             </option>
           ))}
         </select>
+      ) : field.type === "textarea" ? (
+        <textarea
+          id={field.key}
+          value={value || ""}
+          onChange={(e) => onChange(field.key, e.target.value)}
+          disabled={disabled}
+          placeholder={field.placeholder}
+          rows={3}
+          className="rounded-md border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-vertical"
+        />
       ) : (
         <input
           id={field.key}
