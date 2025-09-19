@@ -41,13 +41,6 @@ export default function Page() {
               </div>
             ))}
           </div>
-          <a
-            href="#register"
-            className="mt-4 inline-flex items-center gap-2 rounded-full border border-blue-600/30 bg-white/80 px-6 py-3 text-sm font-semibold text-blue-700 shadow-sm shadow-blue-500/10 backdrop-blur transition hover:-translate-y-0.5 hover:border-blue-600 hover:bg-white hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-          >
-            Begin Registration
-            <span aria-hidden className="inline-block animate-bounce">↘</span>
-          </a>
         </div>
         <div className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 md:block">
           <span className="text-sm uppercase tracking-wider text-slate-500">Scroll</span>
