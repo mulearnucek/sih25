@@ -388,7 +388,7 @@ export default function RegistrationForm() {
         {currentStep === 0 && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
             <p className="text-sm text-slate-600">
-              Sign in with Google to begin your registration.
+              Sign in with Google to view your team.
             </p>
             {!sessionEmail && (
               <div className="flex justify-center">
