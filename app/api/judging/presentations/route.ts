@@ -57,7 +57,50 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "updateOrder" && teamId && order !== undefined) {
-      await Presentation.findOneAndUpdate({ teamId }, { order }, { new: true })
+      const currentPresentation = await Presentation.findOne({ teamId })
+      if (!currentPresentation) {
+        return NextResponse.json({ error: "Team not found" }, { status: 404 })
+      }
+
+      const oldOrder = currentPresentation.order
+      const newOrder = order
+
+      if (oldOrder !== newOrder) {
+        // Reorder other presentations
+        if (newOrder > oldOrder) {
+          // Moving down: shift presentations up
+          await Presentation.updateMany(
+            { order: { $gt: oldOrder, $lte: newOrder }, teamId: { $ne: teamId } },
+            { $inc: { order: -1 } },
+          )
+        } else {
+          // Moving up: shift presentations down
+          await Presentation.updateMany(
+            { order: { $gte: newOrder, $lt: oldOrder }, teamId: { $ne: teamId } },
+            { $inc: { order: 1 } },
+          )
+        }
+
+        // Update the target presentation
+        await Presentation.findOneAndUpdate({ teamId }, { order: newOrder })
+      }
+
+      return NextResponse.json({ success: true })
+    }
+
+    if (action === "removeTeam" && teamId) {
+      const presentation = await Presentation.findOne({ teamId })
+      if (!presentation) {
+        return NextResponse.json({ error: "Team not found" }, { status: 404 })
+      }
+
+      const removedOrder = presentation.order
+
+      // Remove the presentation
+      await Presentation.deleteOne({ teamId })
+
+      // Reorder remaining presentations
+      await Presentation.updateMany({ order: { $gt: removedOrder } }, { $inc: { order: -1 } })
 
       return NextResponse.json({ success: true })
     }

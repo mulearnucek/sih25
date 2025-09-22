@@ -1,0 +1,42 @@
+{
+  "criteria": [
+    {
+      "key": "innovation",
+      "label": "Innovation & Creativity",
+      "description": "Uniqueness and originality of the solution",
+      "maxScore": 10,
+      "weight": 1.0
+    },
+    {
+      "key": "technical",
+      "label": "Technical Implementation",
+      "description": "Quality of code, architecture, and technical approach",
+      "maxScore": 10,
+      "weight": 1.0
+    },
+    {
+      "key": "presentation",
+      "label": "Presentation Quality",
+      "description": "Clarity, communication, and demo effectiveness",
+      "maxScore": 10,
+      "weight": 1.0
+    },
+    {
+      "key": "feasibility",
+      "label": "Feasibility & Scalability",
+      "description": "Practicality and potential for real-world implementation",
+      "maxScore": 10,
+      "weight": 1.0
+    },
+    {
+      "key": "impact",
+      "label": "Social Impact",
+      "description": "Potential positive impact on society and problem-solving effectiveness",
+      "maxScore": 10,
+      "weight": 1.0
+    }
+  ],
+  "totalMaxScore": 50,
+  "passingScore": 25,
+  "timerDuration": 600
+}

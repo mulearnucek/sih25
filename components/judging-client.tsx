@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Trophy, Clock, Users, Star, Send, RefreshCw, Eye } from "lucide-react"
+import { Trophy, Clock, Users, Star, Send, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import useSWR from "swr"
 
@@ -26,49 +26,99 @@ interface Presentation {
 }
 
 interface Score {
-  innovation: number
-  technical: number
-  presentation: number
-  feasibility: number
-  impact: number
+  [key: string]: number
 }
 
-const SCORING_CRITERIA = [
-  { key: "innovation", label: "Innovation & Creativity", description: "Uniqueness and originality of the solution" },
-  {
-    key: "technical",
-    label: "Technical Implementation",
-    description: "Quality of code, architecture, and technical approach",
-  },
-  { key: "presentation", label: "Presentation Quality", description: "Clarity, communication, and demo effectiveness" },
-  {
-    key: "feasibility",
-    label: "Feasibility & Scalability",
-    description: "Practicality and potential for real-world implementation",
-  },
-  {
-    key: "impact",
-    label: "Social Impact",
-    description: "Potential positive impact on society and problem-solving effectiveness",
-  },
-]
+interface RubricCriterion {
+  key: string
+  label: string
+  description: string
+  maxScore: number
+  weight: number
+}
+
+interface TimerSync {
+  currentTime: number
+  isActive: boolean
+  currentTeam: string | null
+}
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function JudgingClient() {
   const { data: session } = useSession()
   const [currentPresenting, setCurrentPresenting] = useState<Presentation | null>(null)
-  const [scores, setScores] = useState<Score>({
-    innovation: 5,
-    technical: 5,
-    presentation: 5,
-    feasibility: 5,
-    impact: 5,
-  })
+  const [scores, setScores] = useState<Score>({})
   const [comments, setComments] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [showAllTeamsModal, setShowAllTeamsModal] = useState(false)
+  const [syncedTimer, setSyncedTimer] = useState<number | null>(null)
+  const [timerActive, setTimerActive] = useState(false)
+  const [rubrics, setRubrics] = useState<RubricCriterion[]>([])
   const { toast } = useToast()
+
+  useEffect(() => {
+    const loadRubrics = async () => {
+      try {
+        const response = await fetch("/config/rubrics.json")
+        const data = await response.json()
+        setRubrics(data.criteria)
+        // Initialize scores with default values
+        const initialScores: Score = {}
+        data.criteria.forEach((criterion: RubricCriterion) => {
+          initialScores[criterion.key] = Math.floor(criterion.maxScore / 2)
+        })
+        setScores(initialScores)
+      } catch (error) {
+        console.error("Failed to load rubrics:", error)
+        // Fallback to default rubrics
+        const defaultRubrics = [
+          {
+            key: "innovation",
+            label: "Innovation & Creativity",
+            description: "Uniqueness and originality of the solution",
+            maxScore: 10,
+            weight: 1.0,
+          },
+          {
+            key: "technical",
+            label: "Technical Implementation",
+            description: "Quality of code, architecture, and technical approach",
+            maxScore: 10,
+            weight: 1.0,
+          },
+          {
+            key: "presentation",
+            label: "Presentation Quality",
+            description: "Clarity, communication, and demo effectiveness",
+            maxScore: 10,
+            weight: 1.0,
+          },
+          {
+            key: "feasibility",
+            label: "Feasibility & Scalability",
+            description: "Practicality and potential for real-world implementation",
+            maxScore: 10,
+            weight: 1.0,
+          },
+          {
+            key: "impact",
+            label: "Social Impact",
+            description: "Potential positive impact on society and problem-solving effectiveness",
+            maxScore: 10,
+            weight: 1.0,
+          },
+        ]
+        setRubrics(defaultRubrics)
+        const initialScores: Score = {}
+        defaultRubrics.forEach((criterion) => {
+          initialScores[criterion.key] = 5
+        })
+        setScores(initialScores)
+      }
+    }
+    loadRubrics()
+  }, [])
 
   const {
     data: presentationsData,
@@ -77,7 +127,7 @@ export default function JudgingClient() {
   } = useSWR(
     "/api/judging/presentations",
     fetcher,
-    { refreshInterval: 10000 }, // Refresh every 10 seconds
+    { refreshInterval: 3000 }, // Faster refresh for better sync
   )
 
   const {
@@ -85,18 +135,32 @@ export default function JudgingClient() {
     error: scoresError,
     mutate: mutateScores,
   } = useSWR(session?.user?.email ? `/api/judging/scores?judgeId=${session.user.email}` : null, fetcher, {
-    refreshInterval: 10000,
+    refreshInterval: 5000,
   })
+
+  const { data: timerSyncData } = useSWR(
+    "/api/judging/timer-sync",
+    fetcher,
+    { refreshInterval: 1000 }, // Real-time timer sync
+  )
 
   const presentations = presentationsData?.presentations || []
   const myScores = scoresData?.scores || []
+
+  useEffect(() => {
+    if (timerSyncData?.timerSync) {
+      const sync: TimerSync = timerSyncData.timerSync
+      setSyncedTimer(sync.currentTime)
+      setTimerActive(sync.isActive)
+    }
+  }, [timerSyncData])
 
   useEffect(() => {
     const presenting = presentations.find((p: Presentation) => p.status === "presenting")
     setCurrentPresenting(presenting || null)
   }, [presentations])
 
-  const handleScoreChange = (criterion: keyof Score, value: number[]) => {
+  const handleScoreChange = (criterion: string, value: number[]) => {
     setScores((prev) => ({
       ...prev,
       [criterion]: value[0],
@@ -147,7 +211,14 @@ export default function JudgingClient() {
     }
   }
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+  }
+
   const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0)
+  const maxTotalScore = rubrics.reduce((sum, criterion) => sum + criterion.maxScore, 0)
   const hasScored = myScores.some((score: any) => score.teamId === currentPresenting?.teamId)
 
   return (
@@ -159,17 +230,15 @@ export default function JudgingClient() {
           <p className="text-slate-600 text-sm sm:text-base">Welcome, {session?.user?.name}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => {
-              mutatePresentations()
-              mutateScores()
-            }}
-            variant="outline"
-            size="sm"
-          >
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
-          </Button>
+          {syncedTimer !== null && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg">
+              <Clock className="h-4 w-4 text-blue-600" />
+              <span className={`font-mono font-semibold ${syncedTimer <= 60 ? "text-red-600" : "text-blue-600"}`}>
+                {formatTime(syncedTimer)}
+              </span>
+              {syncedTimer === 0 && <span className="text-red-600 text-sm font-medium">Time's Up!</span>}
+            </div>
+          )}
           <Dialog open={showAllTeamsModal} onOpenChange={setShowAllTeamsModal}>
             <DialogTrigger asChild>
               <Button variant="outline" size="sm">
@@ -263,7 +332,7 @@ export default function JudgingClient() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 sm:space-y-6">
-            {SCORING_CRITERIA.map((criterion) => (
+            {rubrics.map((criterion) => (
               <div key={criterion.key} className="space-y-3">
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
                   <div className="flex-1">
@@ -271,24 +340,22 @@ export default function JudgingClient() {
                     <p className="text-xs sm:text-sm text-slate-600">{criterion.description}</p>
                   </div>
                   <div className="text-right">
-                    <span className="text-xl sm:text-2xl font-bold text-blue-600">
-                      {scores[criterion.key as keyof Score]}
-                    </span>
-                    <span className="text-slate-500 text-sm sm:text-base">/10</span>
+                    <span className="text-xl sm:text-2xl font-bold text-blue-600">{scores[criterion.key] || 0}</span>
+                    <span className="text-slate-500 text-sm sm:text-base">/{criterion.maxScore}</span>
                   </div>
                 </div>
                 <Slider
-                  value={[scores[criterion.key as keyof Score]]}
-                  onValueChange={(value) => handleScoreChange(criterion.key as keyof Score, value)}
-                  max={10}
+                  value={[scores[criterion.key] || 0]}
+                  onValueChange={(value) => handleScoreChange(criterion.key, value)}
+                  max={criterion.maxScore}
                   min={0}
                   step={1}
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs text-slate-500">
                   <span>0 - Poor</span>
-                  <span>5 - Average</span>
-                  <span>10 - Excellent</span>
+                  <span>{Math.floor(criterion.maxScore / 2)} - Average</span>
+                  <span>{criterion.maxScore} - Excellent</span>
                 </div>
               </div>
             ))}
@@ -300,7 +367,7 @@ export default function JudgingClient() {
                 <h4 className="font-medium text-slate-900">Total Score</h4>
                 <span className="text-2xl sm:text-3xl font-bold text-green-600">
                   {totalScore}
-                  <span className="text-slate-500">/50</span>
+                  <span className="text-slate-500">/{maxTotalScore}</span>
                 </span>
               </div>
             </div>
