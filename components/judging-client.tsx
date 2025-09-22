@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider"
 import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Trophy, Clock, Users, Star, Send, Eye } from "lucide-react"
+import { Trophy, Clock, Users, Star, Send, Eye, Edit2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import useSWR from "swr"
 
@@ -55,6 +55,7 @@ export default function JudgingClient() {
   const [syncedTimer, setSyncedTimer] = useState<number | null>(null)
   const [timerActive, setTimerActive] = useState(false)
   const [rubrics, setRubrics] = useState<RubricCriterion[]>([])
+  const [allScoringComplete, setAllScoringComplete] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
@@ -160,6 +161,16 @@ export default function JudgingClient() {
     setCurrentPresenting(presenting || null)
   }, [presentations])
 
+  useEffect(() => {
+    const completedPresentations = presentations.filter((p: Presentation) => p.status === "completed")
+    const scoredPresentations = myScores.filter((score: any) =>
+      completedPresentations.some((p: Presentation) => p.teamId === score.teamId),
+    )
+    setAllScoringComplete(
+      completedPresentations.length > 0 && scoredPresentations.length === completedPresentations.length,
+    )
+  }, [presentations, myScores])
+
   const handleScoreChange = (criterion: string, value: number[]) => {
     setScores((prev) => ({
       ...prev,
@@ -220,6 +231,32 @@ export default function JudgingClient() {
   const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0)
   const maxTotalScore = rubrics.reduce((sum, criterion) => sum + criterion.maxScore, 0)
   const hasScored = myScores.some((score: any) => score.teamId === currentPresenting?.teamId)
+
+  if (allScoringComplete && !currentPresenting) {
+    return (
+      <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto">
+        <Card className="text-center">
+          <CardContent className="py-12">
+            <div className="mb-6">
+              <Trophy className="h-16 w-16 mx-auto text-green-600 mb-4" />
+              <h1 className="text-2xl font-bold text-slate-900 mb-2">Scoring Complete!</h1>
+              <p className="text-slate-600">You have successfully scored all completed presentations.</p>
+            </div>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button onClick={() => window.open("/leaderboard", "_blank")} size="lg">
+                <Trophy className="h-4 w-4 mr-2" />
+                View Leaderboard
+              </Button>
+              <Button variant="outline" size="lg" onClick={() => setAllScoringComplete(false)}>
+                <Edit2 className="h-4 w-4 mr-2" />
+                Edit Scores
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="p-3 sm:p-4 lg:p-6 max-w-6xl mx-auto">

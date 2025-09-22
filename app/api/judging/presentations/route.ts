@@ -56,6 +56,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, message: "Presentations setup complete" })
     }
 
+    if (action === "resetAll") {
+      // Reset all presentations to waiting status and clear timestamps
+      await Presentation.updateMany(
+        {},
+        {
+          $set: { status: "waiting" },
+          $unset: { startTime: "", endTime: "" },
+        },
+      )
+
+      return NextResponse.json({ success: true, message: "All presentation states reset" })
+    }
+
     if (action === "updateOrder" && teamId && order !== undefined) {
       const currentPresentation = await Presentation.findOne({ teamId })
       if (!currentPresentation) {

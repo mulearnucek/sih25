@@ -62,7 +62,6 @@ export default function ControlPanelClient() {
   const [showAllTeamsModal, setShowAllTeamsModal] = useState(false)
   const [editingOrder, setEditingOrder] = useState<string | null>(null)
   const [newOrder, setNewOrder] = useState<number>(1)
-  const [showJudgeProgress, setShowJudgeProgress] = useState(false)
   const { toast } = useToast()
 
   const {
@@ -231,6 +230,34 @@ export default function ControlPanelClient() {
     broadcastTimerStatus(600, false)
   }
 
+  const resetAllStates = async () => {
+    try {
+      const response = await fetch("/api/judging/presentations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "resetAll" }),
+      })
+
+      if (response.ok) {
+        setCurrentTimer(null)
+        setTimerActive(false)
+        setCurrentTeam(null)
+        broadcastTimerStatus(0, false)
+        toast({
+          title: "Reset Complete",
+          description: "All presentation states have been reset",
+        })
+        mutate()
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reset states",
+        variant: "destructive",
+      })
+    }
+  }
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -255,50 +282,97 @@ export default function ControlPanelClient() {
   const currentPresenting = presentations.find((p: Presentation) => p.status === "presenting")
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Timer and Current Team */}
-      <Card className="lg:col-span-1">
+    <div className="space-y-6">
+      {/* Current Presentation Card with Timer */}
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Timer Control
+            <Trophy className="h-5 w-5" />
+            Current Presentation
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-center">
-            <div
-              className={`text-4xl font-mono font-bold mb-2 ${
-                currentTimer !== null && currentTimer <= 60 ? "text-red-600" : "text-blue-600"
-              }`}
-            >
-              {currentTimer !== null ? formatTime(currentTimer) : "10:00"}
-            </div>
-            {currentTimer === 0 && <div className="text-red-600 font-semibold text-sm mb-2">Time's Up!</div>}
-            {currentPresenting && (
-              <p className="text-sm text-slate-600 mb-4">
-                Currently presenting: <strong>{currentPresenting.teamName}</strong>
-              </p>
-            )}
-          </div>
+        <CardContent>
+          {currentPresenting ? (
+            <div className="space-y-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-xl font-semibold">{currentPresenting.teamName}</h3>
+                  <p className="text-slate-600">Order: {currentPresenting.order}</p>
+                </div>
+                <Badge className="bg-blue-100 text-blue-800">
+                  <Clock className="h-3 w-3 mr-1" />
+                  Presenting
+                </Badge>
+              </div>
 
-          <div className="flex gap-2 justify-center">
-            <Button onClick={startTimer} disabled={!currentTeam || timerActive} size="sm">
-              <Play className="h-4 w-4 mr-1" />
-              Start
-            </Button>
-            <Button onClick={pauseTimer} disabled={!timerActive} variant="outline" size="sm">
-              <Pause className="h-4 w-4 mr-1" />
-              Pause
-            </Button>
-            <Button onClick={resetTimer} variant="outline" size="sm">
-              Reset
-            </Button>
+              <div className="flex flex-col sm:flex-row items-center gap-4 p-4 bg-slate-50 rounded-lg">
+                <div className="text-center">
+                  <div
+                    className={`text-4xl font-mono font-bold mb-2 ${
+                      currentTimer !== null && currentTimer <= 60 ? "text-red-600" : "text-blue-600"
+                    }`}
+                  >
+                    {currentTimer !== null ? formatTime(currentTimer) : "10:00"}
+                  </div>
+                  {currentTimer === 0 && <div className="text-red-600 font-semibold text-sm">Time's Up!</div>}
+                </div>
+
+                <div className="flex gap-2">
+                  <Button onClick={startTimer} disabled={!currentTeam || timerActive} size="sm">
+                    <Play className="h-4 w-4 mr-1" />
+                    Start
+                  </Button>
+                  <Button onClick={pauseTimer} disabled={!timerActive} variant="outline" size="sm">
+                    <Pause className="h-4 w-4 mr-1" />
+                    Pause
+                  </Button>
+                  <Button onClick={resetTimer} variant="outline" size="sm">
+                    Reset
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-slate-500">
+              <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No team is currently presenting</p>
+              <p className="text-sm">Select a team to start presenting</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CheckCircle className="h-5 w-5" />
+            Judge Scoring Progress
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {judgeProgress.map((judge: JudgeCompletion) => (
+              <div key={judge.judgeId} className="p-4 border rounded-lg">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-medium">{judge.judgeName}</h4>
+                  <Badge variant={judge.completedTeams.length === judge.totalTeams ? "default" : "secondary"}>
+                    {judge.completedTeams.length}/{judge.totalTeams}
+                  </Badge>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-blue-600 h-2 rounded-full"
+                    style={{ width: `${(judge.completedTeams.length / judge.totalTeams) * 100}%` }}
+                  ></div>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
 
       {/* Quick Actions */}
-      <Card className="lg:col-span-2">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Trophy className="h-5 w-5" />
@@ -314,39 +388,6 @@ export default function ControlPanelClient() {
             <Button onClick={() => window.open("/leaderboard", "_blank")} variant="outline">
               View Leaderboard
             </Button>
-            <Dialog open={showJudgeProgress} onOpenChange={setShowJudgeProgress}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Judge Progress
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="max-w-2xl">
-                <DialogHeader>
-                  <DialogTitle>Judge Scoring Progress</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  {judgeProgress.map((judge: JudgeCompletion) => (
-                    <Card key={judge.judgeId}>
-                      <CardContent className="p-4">
-                        <div className="flex justify-between items-center mb-2">
-                          <h4 className="font-medium">{judge.judgeName}</h4>
-                          <Badge variant={judge.completedTeams.length === judge.totalTeams ? "default" : "secondary"}>
-                            {judge.completedTeams.length}/{judge.totalTeams}
-                          </Badge>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: `${(judge.completedTeams.length / judge.totalTeams) * 100}%` }}
-                          ></div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </DialogContent>
-            </Dialog>
             <Button onClick={() => mutate()} variant="outline" size="sm">
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
@@ -394,12 +435,31 @@ export default function ControlPanelClient() {
                 </div>
               </DialogContent>
             </Dialog>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm">
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Reset All States
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Reset All States</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will reset all presentation states, timer, and current team. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={resetAllStates}>Reset All</AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </div>
         </CardContent>
       </Card>
 
-      {/* Team Management */}
-      <Card className="lg:col-span-3">
+      <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
@@ -407,136 +467,133 @@ export default function ControlPanelClient() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="space-y-2">
             {presentations
               .sort((a: Presentation, b: Presentation) => a.order - b.order)
               .map((presentation: Presentation) => (
-                <Card key={presentation._id} className="border-2">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-sm">{presentation.teamName}</h3>
-                        <div className="flex items-center gap-2 mt-1">
-                          {editingOrder === presentation.teamId ? (
-                            <div className="flex items-center gap-1">
-                              <Input
-                                type="number"
-                                value={newOrder}
-                                onChange={(e) => setNewOrder(Number.parseInt(e.target.value))}
-                                className="w-16 h-6 text-xs"
-                                min={1}
-                                max={presentations.length}
-                              />
-                              <Button
-                                size="sm"
-                                onClick={() => updateTeamOrder(presentation.teamId, newOrder)}
-                                className="h-6 px-2"
-                              >
-                                ✓
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setEditingOrder(null)}
-                                className="h-6 px-2"
-                              >
-                                ✕
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-1">
-                              <span className="text-xs text-slate-500">Order: {presentation.order}</span>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingOrder(presentation.teamId)
-                                  setNewOrder(presentation.order)
-                                }}
-                                className="h-4 w-4 p-0"
-                              >
-                                <Edit2 className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => moveTeam(presentation.teamId, "up")}
-                                disabled={presentation.order === 1}
-                                className="h-4 w-4 p-0"
-                              >
-                                <ArrowUp className="h-3 w-3" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => moveTeam(presentation.teamId, "down")}
-                                disabled={presentation.order === presentations.length}
-                                className="h-4 w-4 p-0"
-                              >
-                                <ArrowDown className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          )}
+                <div
+                  key={presentation._id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-slate-50"
+                >
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="flex items-center gap-2">
+                      {editingOrder === presentation.teamId ? (
+                        <div className="flex items-center gap-1">
+                          <Input
+                            type="number"
+                            value={newOrder}
+                            onChange={(e) => setNewOrder(Number.parseInt(e.target.value))}
+                            className="w-16 h-8 text-sm"
+                            min={1}
+                            max={presentations.length}
+                          />
+                          <Button
+                            size="sm"
+                            onClick={() => updateTeamOrder(presentation.teamId, newOrder)}
+                            className="h-8 px-2"
+                          >
+                            ✓
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setEditingOrder(null)}
+                            className="h-8 px-2"
+                          >
+                            ✕
+                          </Button>
                         </div>
-                        {!presentation.isParticipating && (
-                          <p className="text-xs text-red-600 mt-1">Not Participating</p>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Badge className={getStatusColor(presentation.status)}>{presentation.status}</Badge>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button size="sm" variant="ghost" className="h-6 w-6 p-0 text-red-600">
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Remove Team</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Are you sure you want to remove {presentation.teamName} from the presentation list? This
-                                action cannot be undone.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancel</AlertDialogCancel>
-                              <AlertDialogAction onClick={() => removeTeam(presentation.teamId)}>
-                                Remove
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
-                      </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-mono w-8 text-center">#{presentation.order}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => {
+                              setEditingOrder(presentation.teamId)
+                              setNewOrder(presentation.order)
+                            }}
+                            className="h-6 w-6 p-0"
+                          >
+                            <Edit2 className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => moveTeam(presentation.teamId, "up")}
+                            disabled={presentation.order === 1}
+                            className="h-6 w-6 p-0"
+                          >
+                            <ArrowUp className="h-3 w-3" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => moveTeam(presentation.teamId, "down")}
+                            disabled={presentation.order === presentations.length}
+                            className="h-6 w-6 p-0"
+                          >
+                            <ArrowDown className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex flex-wrap gap-1">
-                      <Button
-                        size="sm"
-                        variant={presentation.status === "presenting" ? "default" : "outline"}
-                        onClick={() => updateTeamStatus(presentation.teamId, "presenting")}
-                        disabled={presentation.status === "presenting" || !presentation.isParticipating}
-                      >
-                        Present
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateTeamStatus(presentation.teamId, "completed")}
-                        disabled={presentation.status === "completed"}
-                      >
-                        Complete
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => updateTeamStatus(presentation.teamId, "skipped")}
-                        disabled={presentation.status === "skipped"}
-                      >
-                        Skip
-                      </Button>
+                    <div className="flex-1">
+                      <h3 className="font-semibold">{presentation.teamName}</h3>
+                      {!presentation.isParticipating && <p className="text-sm text-red-600">Not Participating</p>}
                     </div>
-                  </CardContent>
-                </Card>
+
+                    <Badge className={getStatusColor(presentation.status)}>{presentation.status}</Badge>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant={presentation.status === "presenting" ? "default" : "outline"}
+                      onClick={() => updateTeamStatus(presentation.teamId, "presenting")}
+                      disabled={presentation.status === "presenting" || !presentation.isParticipating}
+                    >
+                      Present
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => updateTeamStatus(presentation.teamId, "completed")}
+                      disabled={presentation.status === "completed"}
+                    >
+                      Complete
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => updateTeamStatus(presentation.teamId, "skipped")}
+                      disabled={presentation.status === "skipped"}
+                    >
+                      Skip
+                    </Button>
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-red-600">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Remove Team</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to remove {presentation.teamName} from the presentation list? This
+                            action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction onClick={() => removeTeam(presentation.teamId)}>Remove</AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
               ))}
           </div>
         </CardContent>
