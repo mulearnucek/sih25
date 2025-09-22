@@ -1,10 +1,12 @@
-import NextAuth, { NextAuthOptions } from "next-auth"
+import NextAuth, { type NextAuthOptions } from "next-auth"
 import Google from "next-auth/providers/google"
 import CredentialsProvider from "next-auth/providers/credentials"
 
 // Admin credentials from environment
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@sih25.com";
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "SIH2025@Admin";
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@sih25.com"
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "SIH2025@Admin"
+
+const JUDGE_EMAILS = process.env.JUDGE_EMAILS?.split(",").map((email) => email.trim()) || []
 
 // Shared NextAuth configuration (works for current v5 API; fallback logic added for v4)
 export const authOptions: NextAuthOptions = {
@@ -14,19 +16,19 @@ export const authOptions: NextAuthOptions = {
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-  if (credentials?.email === ADMIN_EMAIL && credentials?.password === ADMIN_PASSWORD) {
+        if (credentials?.email === ADMIN_EMAIL && credentials?.password === ADMIN_PASSWORD) {
           return {
             id: "admin",
             email: ADMIN_EMAIL,
             name: "Admin",
-            isAdmin: true
+            isAdmin: true,
           }
         }
         return null
-      }
+      },
     }),
     Google({
       clientId: process.env.AUTH_GOOGLE_ID!,
@@ -35,7 +37,7 @@ export const authOptions: NextAuthOptions = {
   ],
   session: { strategy: "jwt" },
   callbacks: {
-  async jwt({ token, account, profile, user }: { token: any; account?: any; profile?: any; user?: any }) {
+    async jwt({ token, account, profile, user }: { token: any; account?: any; profile?: any; user?: any }) {
       if (account && profile) {
         token.email = (profile as any).email
         token.name = (profile as any).name
@@ -46,22 +48,28 @@ export const authOptions: NextAuthOptions = {
         token.name = user.name
         token.isAdmin = (user as any).isAdmin || false
       }
+
+      if (token.email && JUDGE_EMAILS.includes(token.email)) {
+        token.isJudge = true
+      }
+
       return token
     },
-  async session({ session, token }: { session: any; token: any }) {
+    async session({ session, token }: { session: any; token: any }) {
       if (session && token) {
         session.user = {
           ...session.user,
           email: token.email as string,
           name: token.name as string,
           image: token.picture as string | undefined,
-          isAdmin: token.isAdmin as boolean || false,
+          isAdmin: (token.isAdmin as boolean) || false,
+          isJudge: (token.isJudge as boolean) || false,
         }
       }
       return session
     },
   },
   secret: process.env.NEXTAUTH_SECRET,
-} as const;
+} as const
 
-export const auth = NextAuth(authOptions);
+export const auth = NextAuth(authOptions)

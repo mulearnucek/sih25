@@ -16,15 +16,15 @@ A team registration and management platform for Smart India Hackathon 2025. Buil
 
 
 ### 1. Install
-```bash
+\`\`\`bash
 git clone https://github.com/mulearnucek/sih25.git
 cd sih25
 npm install
-```
+\`\`\`
 
 ### 2. Environment Variables
 Create `.env` file:
-```env
+\`\`\`env
 MONGODB_URI=your_mongodb_connection_string
 AUTH_GOOGLE_ID=your_google_client_id
 AUTH_GOOGLE_SECRET=your_google_client_secret
@@ -32,7 +32,7 @@ NEXTAUTH_SECRET=your_nextauth_secret
 NEXT_PUBLIC_ADMIN_EMAILS=admin@college.edu
 ADMIN_EMAIL=admin@college
 ADMIN_PASSWORD=your_password
-```
+\`\`\`
 
 ### 3. Database Setup
 - Create [MongoDB Atlas](https://cloud.mongodb.com) account
@@ -52,9 +52,9 @@ ADMIN_PASSWORD=your_password
 - Deploy
 
 **Or run locally:**
-```bash
+\`\`\`bash
 npm run dev
-```
+\`\`\`
 
 ## 🎨 Customization
 
