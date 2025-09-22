@@ -6,7 +6,11 @@ import CredentialsProvider from "next-auth/providers/credentials"
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@sih25.com"
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "SIH2025@Admin"
 
-const JUDGE_EMAILS = process.env.JUDGE_EMAILS?.split(",").map((email) => email.trim()) || []
+const JUDGE_CREDENTIALS = [
+  { username: "judge1", password: "judge123" },
+  { username: "judge2", password: "judge123" },
+  { username: "judge3", password: "judge123" },
+]
 
 // Shared NextAuth configuration (works for current v5 API; fallback logic added for v4)
 export const authOptions: NextAuthOptions = {
@@ -27,6 +31,19 @@ export const authOptions: NextAuthOptions = {
             isAdmin: true,
           }
         }
+
+        const judge = JUDGE_CREDENTIALS.find(
+          (j) => j.username === credentials?.email && j.password === credentials?.password,
+        )
+        if (judge) {
+          return {
+            id: judge.username,
+            email: `${judge.username}@sih25.com`,
+            name: judge.username.charAt(0).toUpperCase() + judge.username.slice(1),
+            isJudge: true,
+          }
+        }
+
         return null
       },
     }),
@@ -47,10 +64,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email
         token.name = user.name
         token.isAdmin = (user as any).isAdmin || false
-      }
-
-      if (token.email && JUDGE_EMAILS.includes(token.email)) {
-        token.isJudge = true
+        token.isJudge = (user as any).isJudge || false
       }
 
       return token

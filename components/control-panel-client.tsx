@@ -4,8 +4,10 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Play, Pause, Clock, Users, Trophy, Settings, RefreshCw } from "lucide-react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Play, Pause, Clock, Users, Trophy, Settings, RefreshCw, Eye } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import useSWR from "swr"
 
 interface Presentation {
   _id: string
@@ -19,22 +21,26 @@ interface Presentation {
   isParticipating: boolean
 }
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json())
+
 export default function ControlPanelClient() {
-  const [presentations, setPresentations] = useState<Presentation[]>([])
   const [currentTimer, setCurrentTimer] = useState<number | null>(null)
   const [timerActive, setTimerActive] = useState(false)
   const [currentTeam, setCurrentTeam] = useState<string | null>(null)
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [showAllTeamsModal, setShowAllTeamsModal] = useState(false)
   const { toast } = useToast()
 
-  useEffect(() => {
-    fetchPresentations()
+  const {
+    data: presentationsData,
+    error,
+    mutate,
+  } = useSWR(
+    "/api/judging/presentations",
+    fetcher,
+    { refreshInterval: 5000 }, // Refresh every 5 seconds
+  )
 
-    if (autoRefresh) {
-      const interval = setInterval(fetchPresentations, 5000) // Refresh every 5 seconds
-      return () => clearInterval(interval)
-    }
-  }, [autoRefresh])
+  const presentations = presentationsData?.presentations || []
 
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -57,20 +63,6 @@ export default function ControlPanelClient() {
     return () => clearInterval(interval)
   }, [timerActive, currentTimer, toast])
 
-  const fetchPresentations = async () => {
-    try {
-      const response = await fetch("/api/judging/presentations")
-      const data = await response.json()
-      setPresentations(data.presentations || [])
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to fetch presentations",
-        variant: "destructive",
-      })
-    }
-  }
-
   const setupPresentations = async () => {
     try {
       const response = await fetch("/api/judging/presentations", {
@@ -84,7 +76,7 @@ export default function ControlPanelClient() {
           title: "Success",
           description: "Presentations setup complete",
         })
-        fetchPresentations()
+        mutate() // Refresh data
       }
     } catch (error) {
       toast({
@@ -104,7 +96,7 @@ export default function ControlPanelClient() {
       })
 
       if (response.ok) {
-        fetchPresentations()
+        mutate() // Refresh data
         if (status === "presenting") {
           setCurrentTeam(teamId)
           setCurrentTimer(600) // 10 minutes
@@ -156,7 +148,7 @@ export default function ControlPanelClient() {
     }
   }
 
-  const currentPresenting = presentations.find((p) => p.status === "presenting")
+  const currentPresenting = presentations.find((p: Presentation) => p.status === "presenting")
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -217,17 +209,53 @@ export default function ControlPanelClient() {
             <Button onClick={() => window.open("/leaderboard", "_blank")} variant="outline">
               View Leaderboard
             </Button>
-            <Button onClick={fetchPresentations} variant="outline" size="sm">
+            <Button onClick={() => mutate()} variant="outline" size="sm">
               <RefreshCw className="h-4 w-4 mr-2" />
               Refresh
             </Button>
-            <Button
-              onClick={() => setAutoRefresh(!autoRefresh)}
-              variant={autoRefresh ? "default" : "outline"}
-              size="sm"
-            >
-              Auto-refresh {autoRefresh ? "ON" : "OFF"}
-            </Button>
+            <Dialog open={showAllTeamsModal} onOpenChange={setShowAllTeamsModal}>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Eye className="h-4 w-4 mr-2" />
+                  View All Progress
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                <DialogHeader>
+                  <DialogTitle>All Teams Progress</DialogTitle>
+                </DialogHeader>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+                  {presentations.map((presentation: Presentation) => (
+                    <Card key={presentation._id} className="border">
+                      <CardContent className="p-3">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium text-sm">{presentation.teamName}</h4>
+                          <Badge className={getStatusColor(presentation.status)}>{presentation.status}</Badge>
+                        </div>
+                        <div className="flex justify-between items-center text-xs text-slate-500">
+                          <span>Order: {presentation.order}</span>
+                          {presentation.isParticipating ? (
+                            <span className="text-green-600">Participating</span>
+                          ) : (
+                            <span className="text-red-600">Not Participating</span>
+                          )}
+                        </div>
+                        {presentation.startTime && (
+                          <div className="text-xs text-slate-500 mt-1">
+                            Started: {new Date(presentation.startTime).toLocaleTimeString()}
+                          </div>
+                        )}
+                        {presentation.endTime && (
+                          <div className="text-xs text-slate-500">
+                            Ended: {new Date(presentation.endTime).toLocaleTimeString()}
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </CardContent>
       </Card>
@@ -242,13 +270,14 @@ export default function ControlPanelClient() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {presentations.map((presentation) => (
+            {presentations.map((presentation: Presentation) => (
               <Card key={presentation._id} className="border-2">
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div>
                       <h3 className="font-semibold text-sm">{presentation.teamName}</h3>
                       <p className="text-xs text-slate-500">Order: {presentation.order}</p>
+                      {!presentation.isParticipating && <p className="text-xs text-red-600 mt-1">Not Participating</p>}
                     </div>
                     <Badge className={getStatusColor(presentation.status)}>{presentation.status}</Badge>
                   </div>
@@ -258,7 +287,7 @@ export default function ControlPanelClient() {
                       size="sm"
                       variant={presentation.status === "presenting" ? "default" : "outline"}
                       onClick={() => updateTeamStatus(presentation.teamId, "presenting")}
-                      disabled={presentation.status === "presenting"}
+                      disabled={presentation.status === "presenting" || !presentation.isParticipating}
                     >
                       Present
                     </Button>
