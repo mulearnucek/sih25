@@ -6,14 +6,8 @@ const ScoreSchema = new Schema(
     teamName: { type: String, required: true },
     judgeId: { type: String, required: true, index: true },
     judgeName: { type: String, required: true },
-    // Scoring criteria - flexible structure
-    scores: {
-      innovation: { type: Number, min: 0, max: 10, default: 0 },
-      technical: { type: Number, min: 0, max: 10, default: 0 },
-      presentation: { type: Number, min: 0, max: 10, default: 0 },
-      feasibility: { type: Number, min: 0, max: 10, default: 0 },
-      impact: { type: Number, min: 0, max: 10, default: 0 },
-    },
+    // Scoring criteria - flexible structure to handle any rubric configuration
+    scores: { type: Schema.Types.Mixed, default: {} },
     totalScore: { type: Number, default: 0 },
     comments: { type: String, default: "" },
     isSubmitted: { type: Boolean, default: false },

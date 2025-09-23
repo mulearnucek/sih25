@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         comments: comments || "",
         isSubmitted: true,
       },
-      { upsert: true, new: true },
+      { upsert: true, new: true, strict: false },
     )
 
     return NextResponse.json({ success: true, score: scoreDoc })

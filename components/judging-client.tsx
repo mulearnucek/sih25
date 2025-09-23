@@ -9,7 +9,7 @@ import { Slider } from "@/components/ui/slider"
 import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Trophy, Clock, Users, Star, Send, Eye, Edit2, CheckCircle, BarChart3 } from "lucide-react"
+import { Trophy, Clock, Users, Star, Send, Eye, Edit2, CheckCircle, BarChart3, Download } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import useSWR from "swr"
 
@@ -344,6 +344,58 @@ export default function JudgingClient() {
     setIsEditMode(false)
   }
 
+  const exportToExcel = async () => {
+    try {
+      const response = await fetch('/api/dashboard/export', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to export data')
+      }
+
+      // Get the filename from the response headers or use a default
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = 'scores_export.xlsx'
+      if (contentDisposition) {
+        const matches = /filename="([^"]*)"/.exec(contentDisposition)
+        if (matches != null && matches[1]) {
+          filename = matches[1]
+        }
+      }
+
+      // Create blob from response
+      const blob = await response.blob()
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      
+      // Cleanup
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: "Export Successful",
+        description: "Scores have been exported to Excel file",
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: "Export Failed",
+        description: "Failed to export scores to Excel",
+        variant: "destructive",
+      })
+    }
+  }
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -634,10 +686,21 @@ export default function JudgingClient() {
           </DialogTrigger>
           <DialogContent className="max-w-6xl max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-2xl flex items-center gap-3">
-                <BarChart3 className="h-6 w-6" />
-                Analytics & Leaderboard
-              </DialogTitle>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-2xl flex items-center gap-3">
+                  <BarChart3 className="h-6 w-6" />
+                  Analytics & Leaderboard
+                </DialogTitle>
+                <Button
+                  onClick={exportToExcel}
+                  variant="outline"
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Export to Excel
+                </Button>
+              </div>
             </DialogHeader>
             <div className="space-y-6 mt-6">
               {/* Analytics Overview */}
@@ -678,7 +741,7 @@ export default function JudgingClient() {
                   <div className="space-y-3">
                     {leaderboard.length > 0 ? (
                       leaderboard.map((team: any, index: number) => {
-                        const isCurrentTeam = team.teamId === currentPresenting?.teamId
+                        const isCurrentTeam = team._id === currentPresenting?.teamId
                         const rankColors = {
                           0: "bg-gradient-to-r from-yellow-400 to-yellow-600 text-white", // Gold
                           1: "bg-gradient-to-r from-gray-400 to-gray-600 text-white",    // Silver
@@ -688,7 +751,7 @@ export default function JudgingClient() {
                         
                         return (
                           <div 
-                            key={team.teamId} 
+                            key={team._id} 
                             className={`flex items-center justify-between p-4 rounded-lg border-2 transition-all ${
                               isCurrentTeam 
                                 ? "border-blue-400 bg-blue-50 shadow-md" 
@@ -715,10 +778,10 @@ export default function JudgingClient() {
                             </div>
                             <div className="text-right">
                               <div className="text-xl font-bold text-slate-900">
-                                {team.averageScore.toFixed(1)}
+                                {team.averageScore?.toFixed(1) || '0.0'}
                               </div>
                               <div className="text-sm text-slate-500">
-                                /{team.maxPossibleScore} avg
+                                Total: {team.totalScore || 0}
                               </div>
                             </div>
                           </div>

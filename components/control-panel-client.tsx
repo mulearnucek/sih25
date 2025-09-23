@@ -31,6 +31,7 @@ import {
   ArrowUp,
   ArrowDown,
   ChevronRight,
+  Download,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import useSWR from "swr"
@@ -344,6 +345,58 @@ export default function ControlPanelClient() {
     }
   }
 
+  const exportToExcel = async () => {
+    try {
+      const response = await fetch('/api/dashboard/export', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to export data')
+      }
+
+      // Get the filename from the response headers or use a default
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let filename = 'scores_export.xlsx'
+      if (contentDisposition) {
+        const matches = /filename="([^"]*)"/.exec(contentDisposition)
+        if (matches != null && matches[1]) {
+          filename = matches[1]
+        }
+      }
+
+      // Create blob from response
+      const blob = await response.blob()
+      
+      // Create download link
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      document.body.appendChild(link)
+      link.click()
+      
+      // Cleanup
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      toast({
+        title: "Complete Export Successful",
+        description: "All teams, participants, and scoring data exported to Excel",
+      })
+    } catch (error) {
+      console.error('Export error:', error)
+      toast({
+        title: "Export Failed",
+        description: "Failed to export scores to Excel",
+        variant: "destructive",
+      })
+    }
+  }
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -418,6 +471,10 @@ export default function ControlPanelClient() {
                   <Button onClick={nextTeam} variant="default" size="sm" className="bg-green-600 hover:bg-green-700">
                     <ChevronRight className="h-4 w-4 mr-1" />
                     Next Team
+                  </Button>
+                  <Button onClick={exportToExcel} variant="outline" size="sm" className="bg-blue-50 hover:bg-blue-100 border-blue-200">
+                    <Download className="h-4 w-4 mr-1" />
+                    Export All Data
                   </Button>
                 </div>
               </div>

@@ -16,11 +16,7 @@ interface LeaderboardEntry {
     judgeName: string
     totalScore: number
     scores: {
-      innovation: number
-      technical: number
-      presentation: number
-      feasibility: number
-      impact: number
+      [key: string]: number // Make it flexible to handle any score structure
     }
   }>
 }
@@ -130,30 +126,29 @@ export default function LeaderboardClient() {
                         <div className="flex justify-between items-start mb-2">
                           <span className="text-sm font-medium text-slate-700">{score.judgeName}</span>
                           <Badge variant="outline" className="text-xs">
-                            {score.totalScore}/50
+                            {score.totalScore}
                           </Badge>
                         </div>
                         <div className="grid grid-cols-5 gap-1 text-xs">
-                          <div className="text-center">
-                            <div className="font-medium text-blue-600">{score.scores.innovation}</div>
-                            <div className="text-slate-500">Inn</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-green-600">{score.scores.technical}</div>
-                            <div className="text-slate-500">Tech</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-purple-600">{score.scores.presentation}</div>
-                            <div className="text-slate-500">Pres</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-orange-600">{score.scores.feasibility}</div>
-                            <div className="text-slate-500">Feas</div>
-                          </div>
-                          <div className="text-center">
-                            <div className="font-medium text-red-600">{score.scores.impact}</div>
-                            <div className="text-slate-500">Imp</div>
-                          </div>
+                          {Object.entries(score.scores).slice(0, 5).map(([key, value], idx) => {
+                            const colors = ['text-blue-600', 'text-green-600', 'text-purple-600', 'text-orange-600', 'text-red-600']
+                            const labels = {
+                              'novelty': 'Nov',
+                              'usability': 'Use', 
+                              'social-impact': 'Soc',
+                              'presentation': 'Pres',
+                              'feasibility': 'Feas',
+                              'innovation': 'Inn',
+                              'technical': 'Tech',
+                              'impact': 'Imp'
+                            }
+                            return (
+                              <div key={key} className="text-center">
+                                <div className={`font-medium ${colors[idx] || 'text-slate-600'}`}>{value}</div>
+                                <div className="text-slate-500">{labels[key as keyof typeof labels] || key.slice(0, 3)}</div>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     ))}
