@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email || !session.user.isJudge) {
+    if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized - Judge access required" }, { status: 401 })
     }
 

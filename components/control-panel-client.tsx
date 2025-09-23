@@ -66,6 +66,12 @@ interface JudgeProgressData {
   message?: string
 }
 
+interface TimerSync {
+  currentTime: number
+  isActive: boolean
+  currentTeam: string | null
+}
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function ControlPanelClient() {
@@ -91,6 +97,12 @@ export default function ControlPanelClient() {
     refreshInterval: 5000,
   })
 
+  const { data: timerSyncData } = useSWR(
+    "/api/judging/timer-sync",
+    fetcher,
+    { refreshInterval: 2000 }, // Sync timer state from database
+  )
+
   const presentations = presentationsData?.presentations || []
   const judgeProgressInfo: JudgeProgressData = judgeProgressData || {
     judgeProgress: [],
@@ -98,6 +110,22 @@ export default function ControlPanelClient() {
     totalJudges: 0,
     submittedCount: 0
   }
+
+  // Restore timer state from database on load/refresh
+  useEffect(() => {
+    if (timerSyncData?.timerSync) {
+      const sync = timerSyncData.timerSync
+      setCurrentTimer(sync.currentTime)
+      setTimerActive(sync.isActive)
+      setCurrentTeam(sync.currentTeam)
+      
+      // If timer was active when page was refreshed, ensure it continues
+      if (sync.isActive && sync.currentTime > 0) {
+        // The timer interval will start automatically due to the timerActive state change
+        // No need to manually restart the timer here
+      }
+    }
+  }, [timerSyncData])
 
   useEffect(() => {
     let interval: NodeJS.Timeout
