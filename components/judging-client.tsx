@@ -610,8 +610,8 @@ export default function JudgingClient() {
           </div>
         </div>
       ) : (
-        <div className="h-full flex items-center justify-center text-slate-500">
-          <div className="text-center h-full  flex flex-col items-center justify-center">
+        <div className="min-h-[60vh] flex items-center justify-center text-slate-500">
+          <div className="text-center">
             <Star className="h-16 w-16 mx-auto mb-4 opacity-50" />
             <h3 className="text-xl font-semibold mb-2">No Active Presentation</h3>
             <p className="text-sm">Scoring will be available when a team is presenting</p>
