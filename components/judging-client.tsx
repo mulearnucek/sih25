@@ -6,10 +6,10 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
-import { Textarea } from "@/components/ui/textarea"
+import { Input } from "@/components/ui/input"
 import { Separator } from "@/components/ui/separator"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { Trophy, Clock, Users, Star, Send, Eye, Edit2 } from "lucide-react"
+import { Trophy, Clock, Users, Star, Send, Eye, Edit2, CheckCircle } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import useSWR from "swr"
 
@@ -43,67 +43,77 @@ interface TimerSync {
   currentTeam: string | null
 }
 
+interface JudgeCompletion {
+  judgeId: string
+  judgeName: string
+  completedTeams: string[]
+  totalTeams: number
+}
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
 
 export default function JudgingClient() {
   const { data: session } = useSession()
   const [currentPresenting, setCurrentPresenting] = useState<Presentation | null>(null)
   const [scores, setScores] = useState<Score>({})
-  const [comments, setComments] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [showAllTeamsModal, setShowAllTeamsModal] = useState(false)
   const [syncedTimer, setSyncedTimer] = useState<number | null>(null)
   const [timerActive, setTimerActive] = useState(false)
   const [rubrics, setRubrics] = useState<RubricCriterion[]>([])
   const [allScoringComplete, setAllScoringComplete] = useState(false)
+  const [inputValues, setInputValues] = useState<{ [key: string]: string }>({})
   const { toast } = useToast()
 
   useEffect(() => {
     const loadRubrics = async () => {
-        // Fallback to default rubrics
-        const defaultRubrics = [
-          {
-            key: "novelty",
-            label: "Novelty",
-            description: "Uniqueness and innovation of the solution",
-            maxScore: 100,
-            weight: 1.0,
-          },
-          {
-            key: "usability",
-            label: "Usability",
-            description: "",
-            maxScore: 100,
-            weight: 1.0,
-          },
-          {
-            key: "social-impact",
-            label: "Market potential or Social worth of the solution",
-            description: "",
-            maxScore: 100,
-            weight: 1.0,
-          },
-          {
-            key: "presentation",
-            label: "Presentation Quality",
-            description: "Clarity, communication, and demo effectiveness",
-            maxScore: 100,
-            weight: 1.0,
-          },
-          {
-            key: "feasibility",
-            label: "Feasibility & Scalability",
-            description: "Practicality and potential for real-world implementation",
-            maxScore: 100,
-            weight: 1.0,
-          },
-        ]
-        setRubrics(defaultRubrics)
-        const initialScores: Score = {}
-        defaultRubrics.forEach((criterion) => {
-          initialScores[criterion.key] = 5
-        })
-        setScores(initialScores)
+      // Fallback to default rubrics
+      const defaultRubrics = [
+        {
+          key: "novelty",
+          label: "Novelty",
+          description: "Uniqueness and innovation of the solution",
+          maxScore: 100,
+          weight: 1.0,
+        },
+        {
+          key: "usability",
+          label: "Usability",
+          description: "",
+          maxScore: 100,
+          weight: 1.0,
+        },
+        {
+          key: "social-impact",
+          label: "Market potential or Social worth of the solution",
+          description: "",
+          maxScore: 100,
+          weight: 1.0,
+        },
+        {
+          key: "presentation",
+          label: "Presentation Quality",
+          description: "Clarity, communication, and demo effectiveness",
+          maxScore: 100,
+          weight: 1.0,
+        },
+        {
+          key: "feasibility",
+          label: "Feasibility & Scalability",
+          description: "Practicality and potential for real-world implementation",
+          maxScore: 100,
+          weight: 1.0,
+        },
+      ]
+      setRubrics(defaultRubrics)
+      const initialScores: Score = {}
+      const initialInputs: { [key: string]: string } = {}
+      defaultRubrics.forEach((criterion) => {
+        initialScores[criterion.key] = 5
+        initialInputs[criterion.key] = "5"
+      })
+      setScores(initialScores)
+      setInputValues(initialInputs)
     }
     loadRubrics()
   }, [])
@@ -132,8 +142,13 @@ export default function JudgingClient() {
     { refreshInterval: 1000 }, // Real-time timer sync
   )
 
+  const { data: judgeProgressData } = useSWR("/api/judging/judge-progress", fetcher, {
+    refreshInterval: 5000,
+  })
+
   const presentations = presentationsData?.presentations || []
   const myScores = scoresData?.scores || []
+  const judgeProgress = judgeProgressData?.judgeProgress || []
 
   useEffect(() => {
     if (timerSyncData?.timerSync) {
@@ -159,10 +174,33 @@ export default function JudgingClient() {
   }, [presentations, myScores])
 
   const handleScoreChange = (criterion: string, value: number[]) => {
+    const newValue = value[0]
     setScores((prev) => ({
       ...prev,
-      [criterion]: value[0],
+      [criterion]: newValue,
     }))
+    setInputValues((prev) => ({
+      ...prev,
+      [criterion]: newValue.toString(),
+    }))
+  }
+
+  const handleInputChange = (criterion: string, value: string) => {
+    const numValue = Number.parseInt(value) || 0
+    const maxScore = rubrics.find((r) => r.key === criterion)?.maxScore || 100
+    const clampedValue = Math.max(0, Math.min(numValue, maxScore))
+
+    setInputValues((prev) => ({
+      ...prev,
+      [criterion]: value,
+    }))
+
+    if (!isNaN(numValue) && numValue >= 0 && numValue <= maxScore) {
+      setScores((prev) => ({
+        ...prev,
+        [criterion]: clampedValue,
+      }))
+    }
   }
 
   const submitScore = async () => {
@@ -184,7 +222,7 @@ export default function JudgingClient() {
           teamId: currentPresenting.teamId,
           teamName: currentPresenting.teamName,
           scores,
-          comments,
+          comments: "", // Removed comments field
         }),
       })
 
@@ -193,7 +231,6 @@ export default function JudgingClient() {
           title: "Score Submitted",
           description: `Score for ${currentPresenting.teamName} has been saved`,
         })
-        setComments("")
         mutateScores() // Refresh scores data
       } else {
         throw new Error("Failed to submit score")
@@ -215,13 +252,17 @@ export default function JudgingClient() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
+  const allJudgesCompleted = currentPresenting
+    ? judgeProgress.every((judge: JudgeCompletion) => judge.completedTeams.includes(currentPresenting.teamId))
+    : false
+
   const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0)
   const maxTotalScore = rubrics.reduce((sum, criterion) => sum + criterion.maxScore, 0)
   const hasScored = myScores.some((score: any) => score.teamId === currentPresenting?.teamId)
 
   if (allScoringComplete && !currentPresenting) {
     return (
-      <div className="p-3 sm:p-4 lg:p-6 max-w-4xl mx-auto">
+      <div className="p-4 w-full max-w-full">
         <Card className="text-center">
           <CardContent className="py-12">
             <div className="mb-6">
@@ -246,21 +287,21 @@ export default function JudgingClient() {
   }
 
   return (
-    <div className="p-3 sm:p-4 lg:p-6 max-w-6xl mx-auto">
+    <div className="p-4 w-full max-w-full">
       {/* Header */}
-      <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row justify-between items-start gap-4">
+      <div className="mb-6 flex flex-col lg:flex-row justify-between items-start gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 mb-2">Judge Scoring Interface</h1>
-          <p className="text-slate-600 text-sm sm:text-base">Welcome, {session?.user?.name}</p>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">Judge Scoring Interface</h1>
+          <p className="text-slate-600">Welcome, {session?.user?.name}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           {syncedTimer !== null && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-lg">
-              <Clock className="h-4 w-4 text-blue-600" />
-              <span className={`font-mono font-semibold ${syncedTimer <= 60 ? "text-red-600" : "text-blue-600"}`}>
+            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
+              <Clock className="h-5 w-5 text-blue-600" />
+              <span className={`font-mono font-bold text-xl ${syncedTimer <= 60 ? "text-red-600" : "text-blue-600"}`}>
                 {formatTime(syncedTimer)}
               </span>
-              {syncedTimer === 0 && <span className="text-red-600 text-sm font-medium">Time's Up!</span>}
+              {syncedTimer === 0 && <span className="text-red-600 font-medium ml-2">Time's Up!</span>}
             </div>
           )}
           <Dialog open={showAllTeamsModal} onOpenChange={setShowAllTeamsModal}>
@@ -274,7 +315,7 @@ export default function JudgingClient() {
               <DialogHeader>
                 <DialogTitle>All Teams Progress</DialogTitle>
               </DialogHeader>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
+              <div className="space-y-2 mt-4">
                 {presentations.map((presentation: Presentation) => {
                   const scored = myScores.some((score: any) => score.teamId === presentation.teamId)
                   const statusColor = {
@@ -285,22 +326,20 @@ export default function JudgingClient() {
                   }[presentation.status]
 
                   return (
-                    <Card key={presentation._id} className="border">
-                      <CardContent className="p-3">
-                        <div className="flex justify-between items-start mb-2">
-                          <h4 className="font-medium text-sm">{presentation.teamName}</h4>
+                    <div key={presentation._id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-mono w-8">#{presentation.order}</span>
+                        <div>
+                          <h4 className="font-medium">{presentation.teamName}</h4>
                           {scored && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs mt-1">
                               Scored
                             </Badge>
                           )}
                         </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-slate-500">#{presentation.order}</span>
-                          <Badge className={`text-xs ${statusColor}`}>{presentation.status}</Badge>
-                        </div>
-                      </CardContent>
-                    </Card>
+                      </div>
+                      <Badge className={`${statusColor}`}>{presentation.status}</Badge>
+                    </div>
                   )
                 })}
               </div>
@@ -310,30 +349,36 @@ export default function JudgingClient() {
       </div>
 
       {/* Current Team Status */}
-      <Card className="mb-4 sm:mb-6">
-        <CardHeader className="pb-3 sm:pb-6">
-          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
             <Users className="h-5 w-5" />
             Current Presentation
           </CardTitle>
         </CardHeader>
         <CardContent>
           {currentPresenting ? (
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
               <div>
-                <h3 className="text-lg sm:text-xl font-semibold">{currentPresenting.teamName}</h3>
+                <h3 className="text-xl font-semibold">{currentPresenting.teamName}</h3>
                 <p className="text-slate-600">Order: {currentPresenting.order}</p>
+                <div className="flex items-center gap-2 mt-2">
+                  <CheckCircle className={`h-4 w-4 ${allJudgesCompleted ? "text-green-600" : "text-gray-400"}`} />
+                  <span className={`text-sm ${allJudgesCompleted ? "text-green-600" : "text-gray-600"}`}>
+                    {allJudgesCompleted ? "All judges completed scoring" : "Judges still scoring"}
+                  </span>
+                </div>
               </div>
-              <Badge className="bg-blue-100 text-blue-800 self-start sm:self-center">
+              <Badge className="bg-blue-100 text-blue-800">
                 <Clock className="h-3 w-3 mr-1" />
                 Presenting
               </Badge>
             </div>
           ) : (
-            <div className="text-center py-6 sm:py-8 text-slate-500">
-              <Clock className="h-8 sm:h-12 w-8 sm:w-12 mx-auto mb-3 sm:mb-4 opacity-50" />
-              <p className="text-sm sm:text-base">No team is currently presenting</p>
-              <p className="text-xs sm:text-sm">Please wait for the next presentation to begin</p>
+            <div className="text-center py-8 text-slate-500">
+              <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No team is currently presenting</p>
+              <p className="text-sm">Please wait for the next presentation to begin</p>
             </div>
           )}
         </CardContent>
@@ -341,31 +386,41 @@ export default function JudgingClient() {
 
       {/* Scoring Interface */}
       {currentPresenting && (
-        <Card className="mb-4 sm:mb-6">
-          <CardHeader className="pb-3 sm:pb-6">
-            <CardTitle className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex flex-col lg:flex-row items-start lg:items-center gap-2">
               <div className="flex items-center gap-2">
                 <Star className="h-5 w-5" />
                 Score {currentPresenting.teamName}
               </div>
               {hasScored && (
-                <Badge variant="outline" className="ml-0 sm:ml-2">
+                <Badge variant="outline" className="ml-0 lg:ml-2">
                   Already Scored
                 </Badge>
               )}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4 sm:space-y-6">
+          <CardContent className="space-y-6">
             {rubrics.map((criterion) => (
               <div key={criterion.key} className="space-y-3">
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-2">
+                <div className="flex flex-col lg:flex-row justify-between items-start gap-2">
                   <div className="flex-1">
-                    <h4 className="font-medium text-slate-900 text-sm sm:text-base">{criterion.label}</h4>
-                    <p className="text-xs sm:text-sm text-slate-600">{criterion.description}</p>
+                    <h4 className="font-medium text-slate-900">{criterion.label}</h4>
+                    <p className="text-sm text-slate-600">{criterion.description}</p>
                   </div>
-                  <div className="text-right">
-                    <span className="text-xl sm:text-2xl font-bold text-blue-600">{scores[criterion.key] || 0}</span>
-                    <span className="text-slate-500 text-sm sm:text-base">/{criterion.maxScore}</span>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      type="number"
+                      value={inputValues[criterion.key] || "0"}
+                      onChange={(e) => handleInputChange(criterion.key, e.target.value)}
+                      min={0}
+                      max={criterion.maxScore}
+                      className="w-20 text-center"
+                    />
+                    <div className="text-right">
+                      <span className="text-2xl font-bold text-blue-600">{scores[criterion.key] || 0}</span>
+                      <span className="text-slate-500">/{criterion.maxScore}</span>
+                    </div>
                   </div>
                 </div>
                 <Slider
@@ -387,24 +442,13 @@ export default function JudgingClient() {
             <Separator />
 
             <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
                 <h4 className="font-medium text-slate-900">Total Score</h4>
-                <span className="text-2xl sm:text-3xl font-bold text-green-600">
+                <span className="text-3xl font-bold text-green-600">
                   {totalScore}
                   <span className="text-slate-500">/{maxTotalScore}</span>
                 </span>
               </div>
-            </div>
-
-            <div className="space-y-3">
-              <h4 className="font-medium text-slate-900">Comments (Optional)</h4>
-              <Textarea
-                placeholder="Add any additional comments about the presentation..."
-                value={comments}
-                onChange={(e) => setComments(e.target.value)}
-                rows={3}
-                className="resize-none"
-              />
             </div>
 
             <Button onClick={submitScore} disabled={submitting} className="w-full" size="lg">
@@ -414,56 +458,6 @@ export default function JudgingClient() {
           </CardContent>
         </Card>
       )}
-
-      {/* Team Progress - Compact view for mobile */}
-      <Card className="block sm:hidden">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5" />
-            Teams Progress
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {presentations.slice(0, 5).map((presentation: Presentation) => {
-              const scored = myScores.some((score: any) => score.teamId === presentation.teamId)
-              const statusColor = {
-                waiting: "bg-gray-100 text-gray-800",
-                presenting: "bg-blue-100 text-blue-800",
-                completed: "bg-green-100 text-green-800",
-                skipped: "bg-red-100 text-red-800",
-              }[presentation.status]
-
-              return (
-                <div key={presentation._id} className="flex items-center justify-between p-2 border rounded">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{presentation.teamName}</span>
-                      {scored && (
-                        <Badge variant="outline" className="text-xs">
-                          Scored
-                        </Badge>
-                      )}
-                    </div>
-                    <span className="text-xs text-slate-500">#{presentation.order}</span>
-                  </div>
-                  <Badge className={`text-xs ${statusColor}`}>{presentation.status}</Badge>
-                </div>
-              )
-            })}
-            {presentations.length > 5 && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full mt-2 bg-transparent"
-                onClick={() => setShowAllTeamsModal(true)}
-              >
-                View All {presentations.length} Teams
-              </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }
