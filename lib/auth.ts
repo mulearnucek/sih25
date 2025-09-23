@@ -7,9 +7,9 @@ const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin@sih25.com"
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "SIH2025@Admin"
 
 const JUDGE_CREDENTIALS = [
-  { username: "judge1", password: "judge123" },
-  { username: "judge2", password: "judge123" },
-  { username: "judge3", password: "judge123" },
+  { username: "judge1@uck", password: "judge123" },
+  { username: "judge2@uck", password: "judge123" },
+  { username: "judge3@uck", password: "judge123" },
 ]
 
 // Shared NextAuth configuration (works for current v5 API; fallback logic added for v4)
@@ -38,7 +38,7 @@ export const authOptions: NextAuthOptions = {
         if (judge) {
           return {
             id: judge.username,
-            email: `${judge.username}@sih25.com`,
+            email: `${judge.username}`,
             name: judge.username.charAt(0).toUpperCase() + judge.username.slice(1),
             isJudge: true,
           }

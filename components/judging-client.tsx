@@ -60,53 +60,41 @@ export default function JudgingClient() {
 
   useEffect(() => {
     const loadRubrics = async () => {
-      try {
-        const response = await fetch("/config/rubrics.json")
-        const data = await response.json()
-        setRubrics(data.criteria)
-        // Initialize scores with default values
-        const initialScores: Score = {}
-        data.criteria.forEach((criterion: RubricCriterion) => {
-          initialScores[criterion.key] = Math.floor(criterion.maxScore / 2)
-        })
-        setScores(initialScores)
-      } catch (error) {
-        console.error("Failed to load rubrics:", error)
         // Fallback to default rubrics
         const defaultRubrics = [
           {
-            key: "innovation",
-            label: "Innovation & Creativity",
-            description: "Uniqueness and originality of the solution",
-            maxScore: 10,
+            key: "novelty",
+            label: "Novelty",
+            description: "Uniqueness and innovation of the solution",
+            maxScore: 100,
             weight: 1.0,
           },
           {
-            key: "technical",
-            label: "Technical Implementation",
-            description: "Quality of code, architecture, and technical approach",
-            maxScore: 10,
+            key: "usability",
+            label: "Usability",
+            description: "",
+            maxScore: 100,
+            weight: 1.0,
+          },
+          {
+            key: "social-impact",
+            label: "Market potential or Social worth of the solution",
+            description: "",
+            maxScore: 100,
             weight: 1.0,
           },
           {
             key: "presentation",
             label: "Presentation Quality",
             description: "Clarity, communication, and demo effectiveness",
-            maxScore: 10,
+            maxScore: 100,
             weight: 1.0,
           },
           {
             key: "feasibility",
             label: "Feasibility & Scalability",
             description: "Practicality and potential for real-world implementation",
-            maxScore: 10,
-            weight: 1.0,
-          },
-          {
-            key: "impact",
-            label: "Social Impact",
-            description: "Potential positive impact on society and problem-solving effectiveness",
-            maxScore: 10,
+            maxScore: 100,
             weight: 1.0,
           },
         ]
@@ -116,7 +104,6 @@ export default function JudgingClient() {
           initialScores[criterion.key] = 5
         })
         setScores(initialScores)
-      }
     }
     loadRubrics()
   }, [])
@@ -474,48 +461,6 @@ export default function JudgingClient() {
                 View All {presentations.length} Teams
               </Button>
             )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Team Progress - Full view for larger screens */}
-      <Card className="hidden sm:block">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5" />
-            All Teams Progress
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-            {presentations.map((presentation: Presentation) => {
-              const scored = myScores.some((score: any) => score.teamId === presentation.teamId)
-              const statusColor = {
-                waiting: "bg-gray-100 text-gray-800",
-                presenting: "bg-blue-100 text-blue-800",
-                completed: "bg-green-100 text-green-800",
-                skipped: "bg-red-100 text-red-800",
-              }[presentation.status]
-
-              return (
-                <Card key={presentation._id} className="border">
-                  <CardContent className="p-3">
-                    <div className="flex justify-between items-start mb-2">
-                      <h4 className="font-medium text-sm">{presentation.teamName}</h4>
-                      {scored && (
-                        <Badge variant="outline" className="text-xs">
-                          Scored
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-500">#{presentation.order}</span>
-                      <Badge className={`text-xs ${statusColor}`}>{presentation.status}</Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
           </div>
         </CardContent>
       </Card>

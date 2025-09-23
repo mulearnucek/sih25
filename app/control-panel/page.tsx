@@ -6,6 +6,7 @@ import ControlPanelClient from "@/components/control-panel-client"
 export default async function ControlPanelPage() {
   const session = await getServerSession(authOptions)
 
+  //@ts-ignore
   if (!session?.user?.isAdmin) {
     redirect("/")
   }

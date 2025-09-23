@@ -6,6 +6,11 @@ import JudgingClient from "@/components/judging-client"
 export default async function JudgingPage() {
   const session = await getServerSession(authOptions)
 
+  if(!session){
+    redirect("/api/auth/signin")
+  }
+
+  //@ts-ignore
   if (!session?.user?.isJudge && !session?.user?.isAdmin) {
     redirect("/")
   }
