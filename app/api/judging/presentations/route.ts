@@ -25,7 +25,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
+    const sessionRaw = await getServerSession(authOptions)
+    const session = sessionRaw as { user?: { isAdmin?: boolean } }
     if (!session?.user?.isAdmin) {
       return NextResponse.json({ error: "Unauthorized - Admin access required" }, { status: 401 })
     }
@@ -36,14 +37,20 @@ export async function POST(request: NextRequest) {
     await connectMongoose()
 
     if (action === "setup") {
-      // Setup presentations from teams
+      // Setup presentations from teams with exactly 6 members
       const teams = await Team.find({}).lean()
+
+      // Filter teams to only include those with exactly 6 members
+      const completeTeams = teams.filter(team => {
+        const totalMembers = team.memberUserIds ? team.memberUserIds.length : 0;
+        return totalMembers === 6;
+      });
 
       // Clear existing presentations
       await Presentation.deleteMany({})
 
-      // Create presentations for all teams
-      const presentations = teams.map((team, index) => ({
+      // Create presentations only for complete teams (6 members)
+      const presentations = completeTeams.map((team, index) => ({
         teamId: team._id.toString(),
         teamName: team.name,
         order: index + 1,
@@ -53,7 +60,12 @@ export async function POST(request: NextRequest) {
 
       await Presentation.insertMany(presentations)
 
-      return NextResponse.json({ success: true, message: "Presentations setup complete" })
+      return NextResponse.json({ 
+        success: true, 
+        message: `Presentations setup complete for ${completeTeams.length} complete teams (6 members each)`,
+        totalTeams: teams.length,
+        completeTeams: completeTeams.length
+      })
     }
 
     if (action === "resetAll") {

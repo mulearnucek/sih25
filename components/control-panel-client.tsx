@@ -30,6 +30,7 @@ import {
   CheckCircle,
   ArrowUp,
   ArrowDown,
+  ChevronRight,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import useSWR from "swr"
@@ -46,11 +47,23 @@ interface Presentation {
   isParticipating: boolean
 }
 
-interface JudgeCompletion {
+interface JudgeProgress {
   judgeId: string
   judgeName: string
-  completedTeams: string[]
-  totalTeams: number
+  hasSubmitted: boolean
+  organization?: string
+}
+
+interface JudgeProgressData {
+  judgeProgress: JudgeProgress[]
+  currentTeam: {
+    teamId: string
+    teamName: string
+    order: number
+  } | null
+  totalJudges: number
+  submittedCount: number
+  message?: string
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json())
@@ -79,7 +92,12 @@ export default function ControlPanelClient() {
   })
 
   const presentations = presentationsData?.presentations || []
-  const judgeProgress = judgeProgressData?.judgeProgress || []
+  const judgeProgressInfo: JudgeProgressData = judgeProgressData || {
+    judgeProgress: [],
+    currentTeam: null,
+    totalJudges: 0,
+    submittedCount: 0
+  }
 
   useEffect(() => {
     let interval: NodeJS.Timeout
@@ -258,6 +276,46 @@ export default function ControlPanelClient() {
     }
   }
 
+  const nextTeam = async () => {
+    try {
+      // Find current presenting team
+      const currentPresenting = presentations.find((p: Presentation) => p.status === "presenting")
+      
+      if (currentPresenting) {
+        // Mark current team as completed
+        await updateTeamStatus(currentPresenting.teamId, "completed")
+      }
+
+      // Find next team in order that is waiting
+      const waitingTeams = presentations
+        .filter((p: Presentation) => p.status === "waiting" && p.isParticipating)
+        .sort((a: Presentation, b: Presentation) => a.order - b.order)
+
+      if (waitingTeams.length > 0) {
+        const nextTeam = waitingTeams[0]
+        // Start presenting the next team
+        await updateTeamStatus(nextTeam.teamId, "presenting")
+        
+        toast({
+          title: "Next Team",
+          description: `${nextTeam.teamName} is now presenting`,
+        })
+      } else {
+        toast({
+          title: "No More Teams",
+          description: "All teams have completed their presentations",
+          variant: "default",
+        })
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to progress to next team",
+        variant: "destructive",
+      })
+    }
+  }
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -329,6 +387,10 @@ export default function ControlPanelClient() {
                   <Button onClick={resetTimer} variant="outline" size="sm">
                     Reset
                   </Button>
+                  <Button onClick={nextTeam} variant="default" size="sm" className="bg-green-600 hover:bg-green-700">
+                    <ChevronRight className="h-4 w-4 mr-1" />
+                    Next Team
+                  </Button>
                 </div>
               </div>
             </div>
@@ -347,27 +409,57 @@ export default function ControlPanelClient() {
           <CardTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5" />
             Judge Scoring Progress
+            {judgeProgressInfo.currentTeam && (
+              <span className="text-sm font-normal text-slate-600">
+                - {judgeProgressInfo.currentTeam.teamName}
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {judgeProgress.map((judge: JudgeCompletion) => (
-              <div key={judge.judgeId} className="p-4 border rounded-lg">
-                <div className="flex justify-between items-center mb-2">
-                  <h4 className="font-medium">{judge.judgeName}</h4>
-                  <Badge variant={judge.completedTeams.length === judge.totalTeams ? "default" : "secondary"}>
-                    {judge.completedTeams.length}/{judge.totalTeams}
-                  </Badge>
+          {judgeProgressInfo.currentTeam ? (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
+                <div>
+                  <h4 className="font-semibold">Current Team: {judgeProgressInfo.currentTeam.teamName}</h4>
+                  <p className="text-sm text-slate-600">Order #{judgeProgressInfo.currentTeam.order}</p>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div
-                    className="bg-blue-600 h-2 rounded-full"
-                    style={{ width: `${(judge.completedTeams.length / judge.totalTeams) * 100}%` }}
-                  ></div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-blue-600">
+                    {judgeProgressInfo.submittedCount} / {judgeProgressInfo.totalJudges}
+                  </div>
+                  <div className="text-sm text-slate-600">Judges Submitted</div>
                 </div>
               </div>
-            ))}
-          </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                {judgeProgressInfo.judgeProgress.map((judge: JudgeProgress) => (
+                  <div key={judge.judgeId} className="p-3 border rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h5 className="font-medium text-sm">{judge.judgeName}</h5>
+                        {judge.organization && (
+                          <p className="text-xs text-slate-500">{judge.organization}</p>
+                        )}
+                      </div>
+                      <Badge 
+                        variant={judge.hasSubmitted ? "default" : "secondary"}
+                        className={judge.hasSubmitted ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-600"}
+                      >
+                        {judge.hasSubmitted ? "✓ Submitted" : "Pending"}
+                      </Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-slate-500">
+              <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No team is currently presenting</p>
+              <p className="text-sm">Judge progress will be shown when a team starts presenting</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -381,6 +473,10 @@ export default function ControlPanelClient() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-3">
+            <Button onClick={nextTeam} className="bg-green-600 hover:bg-green-700">
+              <ChevronRight className="h-4 w-4 mr-2" />
+              Next Team
+            </Button>
             <Button onClick={() => window.open("/judging", "_blank")} variant="outline">
               <Trophy className="h-4 w-4 mr-2" />
               Open Judge Interface

@@ -25,6 +25,17 @@ interface Presentation {
   isParticipating: boolean
 }
 
+interface TeamMember {
+  name: string
+  email: string
+  gender: string
+}
+
+interface TeamDetails {
+  team: any
+  members: TeamMember[]
+}
+
 interface Score {
   [key: string]: number
 }
@@ -55,15 +66,33 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json())
 export default function JudgingClient() {
   const { data: session } = useSession()
   const [currentPresenting, setCurrentPresenting] = useState<Presentation | null>(null)
+  const [teamDetails, setTeamDetails] = useState<TeamDetails | null>(null)
   const [scores, setScores] = useState<Score>({})
   const [submitting, setSubmitting] = useState(false)
   const [showAllTeamsModal, setShowAllTeamsModal] = useState(false)
   const [syncedTimer, setSyncedTimer] = useState<number | null>(null)
   const [timerActive, setTimerActive] = useState(false)
+  const [realTimeTimer, setRealTimeTimer] = useState<number | null>(null)
   const [rubrics, setRubrics] = useState<RubricCriterion[]>([])
-  const [allScoringComplete, setAllScoringComplete] = useState(false)
   const [inputValues, setInputValues] = useState<{ [key: string]: string }>({})
   const { toast } = useToast()
+
+  // Real-time timer update
+  useEffect(() => {
+    if (syncedTimer !== null && timerActive) {
+      setRealTimeTimer(syncedTimer)
+      const interval = setInterval(() => {
+        setRealTimeTimer(prev => {
+          if (prev === null || prev <= 0) return 0
+          return prev - 1
+        })
+      }, 1000)
+
+      return () => clearInterval(interval)
+    } else {
+      setRealTimeTimer(syncedTimer)
+    }
+  }, [syncedTimer, timerActive])
 
   useEffect(() => {
     const loadRubrics = async () => {
@@ -161,17 +190,26 @@ export default function JudgingClient() {
   useEffect(() => {
     const presenting = presentations.find((p: Presentation) => p.status === "presenting")
     setCurrentPresenting(presenting || null)
+    
+    // Fetch team details when a team is presenting
+    if (presenting?.teamId) {
+      fetchTeamDetails(presenting.teamId)
+    } else {
+      setTeamDetails(null)
+    }
   }, [presentations])
 
-  useEffect(() => {
-    const completedPresentations = presentations.filter((p: Presentation) => p.status === "completed")
-    const scoredPresentations = myScores.filter((score: any) =>
-      completedPresentations.some((p: Presentation) => p.teamId === score.teamId),
-    )
-    setAllScoringComplete(
-      completedPresentations.length > 0 && scoredPresentations.length === completedPresentations.length,
-    )
-  }, [presentations, myScores])
+  const fetchTeamDetails = async (teamId: string) => {
+    try {
+      const response = await fetch(`/api/judging/team-details?teamId=${teamId}`)
+      if (response.ok) {
+        const data = await response.json()
+        setTeamDetails(data)
+      }
+    } catch (error) {
+      console.error('Error fetching team details:', error)
+    }
+  }
 
   const handleScoreChange = (criterion: string, value: number[]) => {
     const newValue = value[0]
@@ -252,212 +290,263 @@ export default function JudgingClient() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
-  const allJudgesCompleted = currentPresenting
-    ? judgeProgress.every((judge: JudgeCompletion) => judge.completedTeams.includes(currentPresenting.teamId))
-    : false
+  const displayTimer = realTimeTimer !== null ? realTimeTimer : syncedTimer
 
   const totalScore = Object.values(scores).reduce((sum, score) => sum + score, 0)
   const maxTotalScore = rubrics.reduce((sum, criterion) => sum + criterion.maxScore, 0)
   const hasScored = myScores.some((score: any) => score.teamId === currentPresenting?.teamId)
 
-  if (allScoringComplete && !currentPresenting) {
-    return (
-      <div className="p-4 w-full max-w-full">
-        <Card className="text-center">
-          <CardContent className="py-12">
-            <div className="mb-6">
-              <Trophy className="h-16 w-16 mx-auto text-green-600 mb-4" />
-              <h1 className="text-2xl font-bold text-slate-900 mb-2">Scoring Complete!</h1>
-              <p className="text-slate-600">You have successfully scored all completed presentations.</p>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button onClick={() => window.open("/leaderboard", "_blank")} size="lg">
-                <Trophy className="h-4 w-4 mr-2" />
-                View Leaderboard
-              </Button>
-              <Button variant="outline" size="lg" onClick={() => setAllScoringComplete(false)}>
-                <Edit2 className="h-4 w-4 mr-2" />
-                Edit Scores
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
-    <div className="p-4 w-full max-w-full">
-      {/* Header */}
-      <div className="mb-6 flex flex-col lg:flex-row justify-between items-start gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Judge Scoring Interface</h1>
-          <p className="text-slate-600">Welcome, {session?.user?.name}</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {syncedTimer !== null && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
-              <Clock className="h-5 w-5 text-blue-600" />
-              <span className={`font-mono font-bold text-xl ${syncedTimer <= 60 ? "text-red-600" : "text-blue-600"}`}>
-                {formatTime(syncedTimer)}
-              </span>
-              {syncedTimer === 0 && <span className="text-red-600 font-medium ml-2">Time's Up!</span>}
-            </div>
-          )}
-          <Dialog open={showAllTeamsModal} onOpenChange={setShowAllTeamsModal}>
-            <DialogTrigger asChild>
-              <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 mr-2" />
-                View All Progress
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>All Teams Progress</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-2 mt-4">
-                {presentations.map((presentation: Presentation) => {
-                  const scored = myScores.some((score: any) => score.teamId === presentation.teamId)
-                  const statusColor = {
-                    waiting: "bg-gray-100 text-gray-800",
-                    presenting: "bg-blue-100 text-blue-800",
-                    completed: "bg-green-100 text-green-800",
-                    skipped: "bg-red-100 text-red-800",
-                  }[presentation.status]
+    <div className="h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      {/* Main Content - Split Layout */}
+      <div className="flex h-full">
+        {/* Left Side - Team Details and Timer */}
+        <div className="w-1/2 p-6 border-r bg-white">
+          <div className="h-full flex flex-col space-y-6">
+            
+            {/* Timer and Current Team - Combined */}
+            <Card className="shadow-lg">
+              <CardHeader className="bg-white border-b">
+                <CardTitle className="flex items-center gap-3">
+                  <Users className="h-6 w-6" />
+                  Current Presentation
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-6">
+                {/* Timer */}
+                {displayTimer !== null && (
+                  <div className="mb-6">
+                    <div className="flex items-center justify-center gap-3 bg-blue-50 p-4 rounded-lg">
+                      <Clock className="h-6 w-6 text-blue-600" />
+                      <div className="text-center">
+                        <div className={`font-mono font-bold text-3xl ${displayTimer <= 60 ? "text-red-600" : "text-blue-600"}`}>
+                          {formatTime(displayTimer)}
+                        </div>
+                        {displayTimer === 0 && (
+                          <div className="text-red-600 font-bold text-sm mt-1 animate-pulse">TIME'S UP!</div>
+                        )}
+                        {displayTimer <= 60 && displayTimer > 0 && (
+                          <div className="text-red-600 font-semibold text-xs mt-1">Final Minute!</div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-                  return (
-                    <div key={presentation._id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-mono w-8">#{presentation.order}</span>
-                        <div>
-                          <h4 className="font-medium">{presentation.teamName}</h4>
-                          {scored && (
-                            <Badge variant="outline" className="text-xs mt-1">
-                              Scored
-                            </Badge>
-                          )}
+                {currentPresenting ? (
+                  <div className="text-center space-y-4">
+                    <div className="flex justify-center items-center gap-4">
+                      <span className="text-xl font-bold text-blue-600">#{currentPresenting.order}</span>
+                      <h2 className="text-2xl font-bold text-slate-900">{currentPresenting.teamName}</h2>
+                    </div>
+                    
+                    {/* Team Leader */}
+                    {teamDetails?.team?.leaderUserId && (
+                      <div className="mt-4">
+                        <p className="text-xs text-slate-600 mb-1">Team Leader</p>
+                        <div className="text-sm font-medium text-slate-700 bg-slate-50 py-2 px-3 rounded">
+                          {teamDetails.members.find(member => member.email === teamDetails.team.leaderUserId)?.name || teamDetails.team.leaderUserId}
                         </div>
                       </div>
-                      <Badge className={`${statusColor}`}>{presentation.status}</Badge>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-6 text-slate-500">
+                    <Clock className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                    <h3 className="text-lg font-semibold mb-2">No team is currently presenting</h3>
+                    <p className="text-sm">Please wait for the next presentation to begin</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Last Two Scoring Criteria on Left Side */}
+            {currentPresenting && rubrics.slice(-2).map((criterion) => (
+              <Card key={criterion.key} className="shadow-lg">
+                <CardContent className="py-4">
+                  <div className="space-y-3 p-4 bg-white rounded-lg border">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-slate-900 mb-1">{criterion.label}</h3>
+                        {criterion.description && (
+                          <p className="text-sm text-slate-600">{criterion.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          type="number"
+                          value={inputValues[criterion.key] || "0"}
+                          onChange={(e) => handleInputChange(criterion.key, e.target.value)}
+                          min={0}
+                          max={criterion.maxScore}
+                          className="w-20 text-center font-semibold"
+                        />
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-blue-600">{scores[criterion.key] || 0}</div>
+                          <div className="text-sm text-slate-500">/{criterion.maxScore}</div>
+                        </div>
+                      </div>
                     </div>
-                  )
-                })}
+                    <Slider
+                      value={[scores[criterion.key] || 0]}
+                      onValueChange={(value) => handleScoreChange(criterion.key, value)}
+                      max={criterion.maxScore}
+                      min={0}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-slate-500 px-2">
+                      <span>0 - Poor</span>
+                      <span>{Math.floor(criterion.maxScore / 2)} - Average</span>
+                      <span>{criterion.maxScore} - Excellent</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Side - Scoring Form */}
+        <div className="w-1/2 p-6 bg-gray-50 overflow-y-auto">
+          {currentPresenting ? (
+            <Card className="shadow-lg h-full">
+              <CardHeader className="bg-white border-b">
+                <CardTitle className="flex items-center gap-3">
+                  <Star className="h-6 w-6" />
+                  Score {currentPresenting.teamName}
+                  {hasScored && (
+                    <Badge variant="outline" className="ml-4">
+                      Already Scored
+                    </Badge>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="py-6 space-y-6">
+                {rubrics.slice(0, 3).map((criterion) => (
+                  <div key={criterion.key} className="space-y-3 p-4 bg-white rounded-lg border">
+                    <div className="flex justify-between items-start gap-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-slate-900 mb-1">{criterion.label}</h3>
+                        {criterion.description && (
+                          <p className="text-sm text-slate-600">{criterion.description}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Input
+                          type="number"
+                          value={inputValues[criterion.key] || "0"}
+                          onChange={(e) => handleInputChange(criterion.key, e.target.value)}
+                          min={0}
+                          max={criterion.maxScore}
+                          className="w-20 text-center font-semibold"
+                        />
+                        <div className="text-right">
+                          <div className="text-2xl font-bold text-blue-600">{scores[criterion.key] || 0}</div>
+                          <div className="text-sm text-slate-500">/{criterion.maxScore}</div>
+                        </div>
+                      </div>
+                    </div>
+                    <Slider
+                      value={[scores[criterion.key] || 0]}
+                      onValueChange={(value) => handleScoreChange(criterion.key, value)}
+                      max={criterion.maxScore}
+                      min={0}
+                      step={1}
+                      className="w-full"
+                    />
+                    <div className="flex justify-between text-xs text-slate-500 px-2">
+                      <span>0 - Poor</span>
+                      <span>{Math.floor(criterion.maxScore / 2)} - Average</span>
+                      <span>{criterion.maxScore} - Excellent</span>
+                    </div>
+                  </div>
+                ))}
+
+                <Separator className="my-6" />
+
+                {/* Total Score Display - Made Smaller */}
+                <div className="bg-gradient-to-r from-green-50 to-emerald-50 p-4 rounded-lg text-center">
+                  <h3 className="text-base font-semibold text-slate-900 mb-2">Total Score</h3>
+                  <div className="text-2xl font-bold text-green-600 mb-1">
+                    {totalScore}
+                    <span className="text-lg text-slate-500 ml-2">/ {maxTotalScore}</span>
+                  </div>
+                  <div className="text-sm text-slate-600">
+                    {Math.round((totalScore / maxTotalScore) * 100)}% of maximum score
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <Button 
+                  onClick={submitScore} 
+                  disabled={submitting} 
+                  className="w-full text-lg py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700" 
+                  size="lg"
+                >
+                  <Send className="h-5 w-5 mr-2" />
+                  {submitting ? "Submitting..." : hasScored ? "Update Score" : "Submit Score"}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="h-full flex items-center justify-center text-slate-500">
+              <div className="text-center">
+                <Star className="h-16 w-16 mx-auto mb-4 opacity-50" />
+                <h3 className="text-xl font-semibold mb-2">No Active Presentation</h3>
+                <p className="text-sm">Scoring will be available when a team is presenting</p>
               </div>
-            </DialogContent>
-          </Dialog>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Current Team Status */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Current Presentation
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {currentPresenting ? (
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-              <div>
-                <h3 className="text-xl font-semibold">{currentPresenting.teamName}</h3>
-                <p className="text-slate-600">Order: {currentPresenting.order}</p>
-                <div className="flex items-center gap-2 mt-2">
-                  <CheckCircle className={`h-4 w-4 ${allJudgesCompleted ? "text-green-600" : "text-gray-400"}`} />
-                  <span className={`text-sm ${allJudgesCompleted ? "text-green-600" : "text-gray-600"}`}>
-                    {allJudgesCompleted ? "All judges completed scoring" : "Judges still scoring"}
-                  </span>
-                </div>
-              </div>
-              <Badge className="bg-blue-100 text-blue-800">
-                <Clock className="h-3 w-3 mr-1" />
-                Presenting
-              </Badge>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-slate-500">
-              <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No team is currently presenting</p>
-              <p className="text-sm">Please wait for the next presentation to begin</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Floating Action Button for View All Teams */}
+      <Dialog open={showAllTeamsModal} onOpenChange={setShowAllTeamsModal}>
+        <DialogTrigger asChild>
+          <Button 
+            className="fixed bottom-6 right-6 w-14 h-14 rounded-full shadow-lg z-50"
+            size="lg"
+          >
+            <Eye className="h-6 w-6" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">All Teams Progress</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3 mt-6">
+            {presentations.map((presentation: Presentation) => {
+              const scored = myScores.some((score: any) => score.teamId === presentation.teamId)
+              const statusColor = {
+                waiting: "bg-gray-100 text-gray-800",
+                presenting: "bg-blue-100 text-blue-800",
+                completed: "bg-green-100 text-green-800",
+                skipped: "bg-red-100 text-red-800",
+              }[presentation.status]
 
-      {/* Scoring Interface */}
-      {currentPresenting && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex flex-col lg:flex-row items-start lg:items-center gap-2">
-              <div className="flex items-center gap-2">
-                <Star className="h-5 w-5" />
-                Score {currentPresenting.teamName}
-              </div>
-              {hasScored && (
-                <Badge variant="outline" className="ml-0 lg:ml-2">
-                  Already Scored
-                </Badge>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {rubrics.map((criterion) => (
-              <div key={criterion.key} className="space-y-3">
-                <div className="flex flex-col lg:flex-row justify-between items-start gap-2">
-                  <div className="flex-1">
-                    <h4 className="font-medium text-slate-900">{criterion.label}</h4>
-                    <p className="text-sm text-slate-600">{criterion.description}</p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <Input
-                      type="number"
-                      value={inputValues[criterion.key] || "0"}
-                      onChange={(e) => handleInputChange(criterion.key, e.target.value)}
-                      min={0}
-                      max={criterion.maxScore}
-                      className="w-20 text-center"
-                    />
-                    <div className="text-right">
-                      <span className="text-2xl font-bold text-blue-600">{scores[criterion.key] || 0}</span>
-                      <span className="text-slate-500">/{criterion.maxScore}</span>
+              return (
+                <div key={presentation._id} className="flex items-center justify-between p-4 border rounded-lg bg-white shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <span className="text-lg font-mono font-bold w-12 text-center">#{presentation.order}</span>
+                    <div>
+                      <h4 className="text-lg font-semibold">{presentation.teamName}</h4>
+                      {scored && (
+                        <Badge variant="outline" className="text-sm mt-1">
+                          ✓ Scored
+                        </Badge>
+                      )}
                     </div>
                   </div>
+                  <Badge className={`${statusColor} text-sm py-1 px-3`}>
+                    {presentation.status.charAt(0).toUpperCase() + presentation.status.slice(1)}
+                  </Badge>
                 </div>
-                <Slider
-                  value={[scores[criterion.key] || 0]}
-                  onValueChange={(value) => handleScoreChange(criterion.key, value)}
-                  max={criterion.maxScore}
-                  min={0}
-                  step={1}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-slate-500">
-                  <span>0 - Poor</span>
-                  <span>{Math.floor(criterion.maxScore / 2)} - Average</span>
-                  <span>{criterion.maxScore} - Excellent</span>
-                </div>
-              </div>
-            ))}
-
-            <Separator />
-
-            <div className="space-y-3">
-              <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-2">
-                <h4 className="font-medium text-slate-900">Total Score</h4>
-                <span className="text-3xl font-bold text-green-600">
-                  {totalScore}
-                  <span className="text-slate-500">/{maxTotalScore}</span>
-                </span>
-              </div>
-            </div>
-
-            <Button onClick={submitScore} disabled={submitting} className="w-full" size="lg">
-              <Send className="h-4 w-4 mr-2" />
-              {submitting ? "Submitting..." : hasScored ? "Update Score" : "Submit Score"}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+              )
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
