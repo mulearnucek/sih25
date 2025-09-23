@@ -666,40 +666,6 @@ export default function JudgingClient() {
                 </Card>
               </div>
 
-              {/* Judge Progress */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Judge Progress Overview</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {judgeProgress.map((judge: JudgeCompletion) => (
-                      <div key={judge.judgeId} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div>
-                          <div className="font-semibold">{judge.judgeName}</div>
-                          <div className="text-sm text-slate-600">
-                            {judge.completedTeams.length} / {judge.totalTeams} teams scored
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="w-32 bg-gray-200 rounded-full h-2">
-                            <div 
-                              className="bg-green-600 h-2 rounded-full transition-all"
-                              style={{ 
-                                width: `${(judge.completedTeams.length / judge.totalTeams) * 100}%` 
-                              }}
-                            ></div>
-                          </div>
-                          <span className="text-sm font-semibold">
-                            {Math.round((judge.completedTeams.length / judge.totalTeams) * 100)}%
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
               {/* Leaderboard */}
               <Card>
                 <CardHeader>

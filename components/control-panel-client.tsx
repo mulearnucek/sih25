@@ -454,7 +454,7 @@ export default function ControlPanelClient() {
                 </div>
                 <div className="text-right">
                   <div className="text-lg font-bold text-blue-600">
-                    {judgeProgressInfo.submittedCount} / {judgeProgressInfo.totalJudges}
+                    {judgeProgressInfo.submittedCount} / 3
                   </div>
                   <div className="text-sm text-slate-600">Judges Submitted</div>
                 </div>
